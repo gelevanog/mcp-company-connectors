@@ -44,7 +44,7 @@ export function createHelpdeskServer(options: HelpdeskServerOptions): McpServer 
     async (uri, variables, ctx) => {
       const actor = resolveActor(ctx, options.fallbackActor);
       if (!hasScope(actor, 'helpdesk:read')) throw new ToolError('insufficient scope: helpdesk:read');
-      const { detail, untrusted } = await loadTicket({ db: options.db }, String(variables.id ?? ''));
+      const { detail, untrusted } = await loadTicket({ db: options.db }, String(variables.id ?? ''), actor);
       return {
         contents: [{ uri: uri.href, mimeType: 'application/json', text: JSON.stringify(detail, null, 2) }],
         _meta: { [META.untrustedPaths]: untrusted },

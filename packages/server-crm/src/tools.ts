@@ -7,6 +7,7 @@ import {
   hasScope,
   idempotencyKey,
   likePattern,
+  wordsMatch,
   nowIso,
   queryOne,
   queryRows,
@@ -35,9 +36,16 @@ const contact = z.object({
   company_name: z.string(),
   name: z.string(),
   title: z.string(),
-  email: z.string(),
-  phone: z.string(),
+  email: z.string().nullable().describe('null without the contacts:pii scope'),
+  phone: z.string().nullable().describe('null without the contacts:pii scope'),
 });
+
+type ContactRow = z.infer<typeof contact>;
+
+/** Contact emails and phone numbers are personal data: only roles with contacts:pii see them. */
+export function redactContacts(ctx: Pick<ToolContext, 'actor'>, rows: ContactRow[]): ContactRow[] {
+  return hasScope(ctx.actor, 'contacts:pii') ? rows : rows.map((row) => ({ ...row, email: null, phone: null }));
+}
 
 const dealSummary = z.object({
   id: z.string(),
@@ -97,10 +105,7 @@ export const searchCompanies = defineTool({
     const offset = decodeCursor(args.cursor);
     const where: string[] = [];
     const params: unknown[] = [];
-    if (args.query) {
-      params.push(likePattern(args.query));
-      where.push(`(c.name ILIKE $${params.length} OR c.domain ILIKE $${params.length})`);
-    }
+    if (args.query) where.push(wordsMatch(['c.name', 'c.domain'], args.query, params));
     if (args.region) {
       params.push(args.region);
       where.push(`c.region = $${params.length}`);
@@ -139,6 +144,7 @@ export const getCompany = defineTool({
     deals: z.array(dealSummary).optional(),
     notes: z.array(note).optional(),
     pipeline_visible: z.boolean(),
+    personal_data_visible: z.boolean().describe('false: contact emails and phone numbers are withheld for this role'),
   }),
   annotations: { readOnlyHint: true, openWorldHint: false },
   untrustedFields: ['body'],
@@ -158,8 +164,9 @@ export const getCompany = defineTool({
       [found.id],
     );
     const pipelineVisible = hasScope(ctx.actor, 'crm:deals');
+    const personal = hasScope(ctx.actor, 'contacts:pii');
     if (!pipelineVisible) {
-      return { data: { company, contacts, pipeline_visible: false } };
+      return { data: { company, contacts: redactContacts(ctx, contacts), pipeline_visible: false, personal_data_visible: personal } };
     }
     const deals = await queryRows<z.infer<typeof dealSummary>>(ctx.db, `${DEAL_SELECT} WHERE d.company_id = $1 ORDER BY d.stage_changed_at DESC`, [found.id]);
     const notes = await queryRows<z.infer<typeof note>>(
@@ -169,7 +176,7 @@ export const getCompany = defineTool({
       [found.id],
     );
     return {
-      data: { company, contacts, deals, notes, pipeline_visible: true },
+      data: { company, contacts: redactContacts(ctx, contacts), deals, notes, pipeline_visible: true, personal_data_visible: personal },
       untrusted: notes.map((_, index) => `/notes/${index}/body`),
     };
   },
@@ -178,7 +185,7 @@ export const getCompany = defineTool({
 export const searchContacts = defineTool({
   name: 'crm_search_contacts',
   title: 'Search contacts',
-  description: 'Find people at customer companies by name, email or company. Returns email and phone.',
+  description: 'Find people at customer companies by name, title, email or company. Email and phone are included for roles allowed to see personal data.',
   scope: 'crm:read',
   input: z.object({
     query: z.string().max(100).optional().describe('Part of the name or email address'),
@@ -192,10 +199,7 @@ export const searchContacts = defineTool({
     const offset = decodeCursor(args.cursor);
     const where: string[] = [];
     const params: unknown[] = [];
-    if (args.query) {
-      params.push(likePattern(args.query));
-      where.push(`(p.name ILIKE $${params.length} OR p.email ILIKE $${params.length})`);
-    }
+    if (args.query) where.push(wordsMatch(hasScope(ctx.actor, 'contacts:pii') ? ['p.name', 'p.email', 'p.title'] : ['p.name', 'p.title'], args.query, params));
     if (args.company) {
       const found = await companyByIdOrName(ctx, args.company);
       params.push(found.id);
@@ -210,7 +214,7 @@ export const searchContacts = defineTool({
        ORDER BY c.name, p.name LIMIT ${args.limit} OFFSET ${offset}`,
       params,
     );
-    return { data: { contacts: rows, total, next_cursor: offset + rows.length < total ? encodeCursor(offset + rows.length) : null } };
+    return { data: { contacts: redactContacts(ctx, rows), total, next_cursor: offset + rows.length < total ? encodeCursor(offset + rows.length) : null } };
   },
 });
 
@@ -246,7 +250,7 @@ export const searchDeals = defineTool({
       params.push(value);
       where.push(sql.replace('?', `$${params.length}`));
     };
-    if (args.query) add('(d.name ILIKE ? OR c.name ILIKE ?)'.replace('?', `$${params.length + 1}`), likePattern(args.query));
+    if (args.query) where.push(wordsMatch(['d.name', 'c.name'], args.query, params));
     if (args.company) add('d.company_id = ?', (await companyByIdOrName(ctx, args.company)).id);
     if (args.stage) add('d.stage = ?', args.stage);
     if (args.open_only) where.push(`d.stage NOT IN ('won', 'lost')`);

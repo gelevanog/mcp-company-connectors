@@ -5,7 +5,9 @@ import {
   defineTool,
   encodeCursor,
   idempotencyKey,
+  hasScope,
   likePattern,
+  wordsMatch,
   nowIso,
   queryOne,
   queryRows,
@@ -91,7 +93,7 @@ export const searchTickets = defineTool({
       params.push(value);
       where.push(sql.replaceAll('?', `$${params.length}`));
     };
-    if (args.query) add('(t.subject ILIKE ? OR t.body ILIKE ?)', likePattern(args.query));
+    if (args.query) where.push(wordsMatch(['t.subject', 't.body'], args.query, params));
     if (args.company) {
       const company = await queryOne<{ id: string }>(ctx.db, 'SELECT id FROM crm.companies WHERE id = $1 OR name ILIKE $2 ORDER BY (id = $1) DESC LIMIT 1', [args.company, likePattern(args.company)]);
       if (!company) throw new ToolError(`no company matches "${args.company}"`, 'not_found');
@@ -120,13 +122,14 @@ export const searchTickets = defineTool({
   },
 });
 
-export async function loadTicket(ctx: Pick<ToolContext, 'db'>, id: string): Promise<{ detail: z.infer<typeof ticketDetail>; untrusted: string[] }> {
+export async function loadTicket(ctx: Pick<ToolContext, 'db'>, id: string, actor?: ToolContext['actor']): Promise<{ detail: z.infer<typeof ticketDetail>; untrusted: string[] }> {
   const ticket = await queryOne<z.infer<typeof ticketDetail>['ticket']>(
     ctx.db,
     `${summarySelect(2).replace('t.updated_at,', 't.updated_at, t.body, p.email AS requester_email, t.resolved_at,')} WHERE t.id = $1`,
     [id.toUpperCase(), today()],
   );
   if (!ticket) throw new ToolError(`ticket ${id} not found`, 'not_found');
+  if (actor && !hasScope(actor, 'contacts:pii')) ticket.requester_email = null;
   const comments = await queryRows<z.infer<typeof comment>>(
     ctx.db,
     'SELECT id, author_type, author_name, internal, body, created_at FROM helpdesk.comments WHERE ticket_id = $1 ORDER BY created_at, id',
@@ -146,7 +149,7 @@ export const getTicket = defineTool({
   annotations: { readOnlyHint: true, openWorldHint: false },
   untrustedFields: ['body'],
   async handler(args, ctx) {
-    const { detail, untrusted } = await loadTicket(ctx, args.ticket_id);
+    const { detail, untrusted } = await loadTicket(ctx, args.ticket_id, ctx.actor);
     return { data: detail, untrusted };
   },
 });

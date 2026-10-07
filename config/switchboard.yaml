@@ -16,14 +16,14 @@ tenants:
     roles:
       sales:
         description: Account executives. Full CRM, read-only helpdesk, calendar and email.
-        scopes: [crm:read, crm:deals, crm:write, helpdesk:read, kb:read, calendar:read, calendar:write, email:draft, email:send]
+        scopes: [crm:read, crm:deals, crm:write, contacts:pii, helpdesk:read, kb:read, calendar:read, calendar:write, email:draft, email:send]
         tools: ['crm_*', helpdesk_search_tickets, helpdesk_get_ticket, 'kb_*', 'calendar_*', 'email_*']
       support:
         description: Support engineers. Helpdesk, companies and contacts (no deals or pipeline), calendar and email.
-        scopes: [crm:read, helpdesk:read, helpdesk:write, kb:read, calendar:read, calendar:write, email:draft, email:send]
+        scopes: [crm:read, contacts:pii, helpdesk:read, helpdesk:write, kb:read, calendar:read, calendar:write, email:draft, email:send]
         tools: [crm_search_companies, crm_get_company, crm_search_contacts, 'helpdesk_*', 'kb_*', 'calendar_*', 'email_*']
       analyst:
-        description: Revenue analysts. Read-only everywhere, plus read-only SQL.
+        description: Revenue analysts. Read-only everywhere, plus read-only SQL; no contact emails or phone numbers.
         scopes: [crm:read, crm:deals, helpdesk:read, analytics:query, kb:read]
         tools: ['analytics_*', crm_search_companies, crm_get_company, crm_search_deals, crm_get_deal, helpdesk_search_tickets, helpdesk_get_ticket, 'kb_*']
       admin:

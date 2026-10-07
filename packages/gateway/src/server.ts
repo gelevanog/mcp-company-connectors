@@ -8,7 +8,6 @@ import {
   type ReadResourceResult,
   type RequestStateCodec,
   type Resource,
-  type ResourceTemplateType,
   type ServerContext,
   type StandardSchemaWithJSON,
   type Tool,
@@ -99,6 +98,8 @@ export function listedTools(deps: Pick<GatewayDeps, 'tenantName' | 'tenant' | 'o
 function canElicit(ctx: ServerContext, server: McpServer, serve: ServeContext): boolean {
   const envelope = ctx.mcpReq.envelope as Record<string, unknown> | undefined;
   const modern = envelope?.['io.modelcontextprotocol/clientCapabilities'] as ClientCapabilities | undefined;
+  // 2025-era stdio sessions keep the capabilities from initialize; stateless 2025 HTTP requests have none to read.
+  // eslint-disable-next-line @typescript-eslint/no-deprecated
   const caps = serve.era === 'modern' ? modern : serve.transport === 'stdio' ? server.server.getClientCapabilities() : undefined;
   const elicitation = caps?.elicitation as Record<string, unknown> | undefined;
   if (!elicitation) return false;
@@ -143,7 +144,7 @@ export async function buildGatewayServer(deps: GatewayDeps, session: Session, se
     {
       instructions: gatewayInstructions(deps, session),
       capabilities: { tools: { listChanged: false }, resources: {}, prompts: {}, completions: {} },
-      requestState: { verify: deps.stateCodec.verify },
+      requestState: { verify: deps.stateCodec.verify.bind(deps.stateCodec) },
     },
   );
   const auditBase = { tenant: session.tenant, userId: session.userId, role: session.role, clientId: session.clientId, clientName: session.clientName };
@@ -257,7 +258,7 @@ export async function buildGatewayServer(deps: GatewayDeps, session: Session, se
         }
         const out: CallToolResult = {
           content,
-          ...(outStructured !== undefined && !result.isError && { structuredContent: outStructured as Record<string, unknown> }),
+          ...(outStructured !== undefined && !result.isError && { structuredContent: outStructured }),
           ...(result.isError && { isError: true }),
           _meta: { 'io.switchboard/upstream': entry.upstream, ...(flags.length > 0 && { 'io.switchboard/flags': flags }) },
         };
@@ -279,7 +280,7 @@ export async function buildGatewayServer(deps: GatewayDeps, session: Session, se
   // Resources: templates and lists from the upstreams the user can read, routed by URI scheme.
   const templateScope = (uri: string): string | undefined => {
     const scheme = uri.split(':')[0];
-    const template = catalog.templates.find((entry) => String(entry.template.uriTemplate).startsWith(`${scheme}:`));
+    const template = catalog.templates.find((entry) => entry.template.uriTemplate.startsWith(`${scheme}:`));
     const scope = template?.template._meta?.[META.scope];
     return typeof scope === 'string' ? scope : undefined;
   };

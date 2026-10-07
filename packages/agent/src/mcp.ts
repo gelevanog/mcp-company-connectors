@@ -82,8 +82,8 @@ export async function connectGateway(options: ConnectOptions): Promise<GatewayCo
           text: content.map((block) => (block.type === 'text' ? (block.text ?? '') : `[${block.type}]`)).join('\n'),
           structured: result.structuredContent,
           flags: Array.isArray(meta['io.switchboard/flags']) ? (meta['io.switchboard/flags'] as string[]) : [],
-          decision: typeof meta['io.switchboard/decision'] === 'string' ? (meta['io.switchboard/decision'] as string) : undefined,
-          upstream: typeof meta['io.switchboard/upstream'] === 'string' ? (meta['io.switchboard/upstream'] as string) : undefined,
+          decision: typeof meta['io.switchboard/decision'] === 'string' ? (meta['io.switchboard/decision']) : undefined,
+          upstream: typeof meta['io.switchboard/upstream'] === 'string' ? (meta['io.switchboard/upstream']) : undefined,
           latencyMs: Math.round(performance.now() - started),
           confirmations: confirmations - before,
         };

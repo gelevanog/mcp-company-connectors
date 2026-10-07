@@ -203,7 +203,7 @@ export function validateSql(input: string, options: ValidatorOptions): Validatio
     const message = error instanceof Error ? error.message.split('\n')[0] ?? 'syntax error' : 'syntax error';
     return fail('parse_error', `could not parse the query (PostgreSQL dialect): ${message.slice(0, 300)}`);
   }
-  const statements = Array.isArray(ast) ? ast : [ast];
+  const statements: unknown[] = Array.isArray(ast) ? (ast as unknown[]) : [ast];
   if (statements.length !== 1) return fail('multiple_statements', 'exactly one statement is allowed');
   const statement = statements[0];
   if (!isNode(statement)) return fail('parse_error', 'could not parse the query');
@@ -244,7 +244,7 @@ export function validateSql(input: string, options: ValidatorOptions): Validatio
 
   const deniedColumns = new Set<string>();
   for (const columns of referenced.values()) for (const column of columns) deniedColumns.add(column);
-  let columnList: string[] = [];
+  let columnList: string[];
   try {
     columnList = parser.columnList(sql, PARSE_OPTIONS);
   } catch {

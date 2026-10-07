@@ -81,6 +81,26 @@ export async function checkRecipients(db: Queryable, addresses: string[]): Promi
   return { internal, external };
 }
 
+/** Kestrel colleagues can be named by id or name ("sam", "Tara Lindqvist"); everyone else needs an address. */
+export async function resolveAddresses(db: Queryable, entries: string[]): Promise<string[]> {
+  const out: string[] = [];
+  for (const entry of entries) {
+    const value = entry.trim();
+    if (value.includes('@')) {
+      out.push(value.toLowerCase());
+      continue;
+    }
+    const row = await queryOne<{ email: string }>(
+      db,
+      `SELECT email FROM core.employees WHERE id = lower($1) OR lower(name) = lower($1) OR lower(split_part(name, ' ', 1)) = lower($1) ORDER BY (id = lower($1)) DESC LIMIT 1`,
+      [value],
+    );
+    if (!row) throw new ToolError(`"${value}" is not a Kestrel employee; give an email address for anyone else`, 'recipient_not_allowed');
+    out.push(row.email);
+  }
+  return [...new Set(out)];
+}
+
 async function employee(db: Queryable, idOrEmail: string): Promise<{ id: string; name: string; email: string; timezone: string }> {
   const row = await queryOne<{ id: string; name: string; email: string; timezone: string }>(
     db,
@@ -188,7 +208,7 @@ export function workspaceTools(): AnyToolSpec[] {
       title: z.string().min(2).max(200),
       start: z.iso.datetime({ offset: true }).describe('ISO 8601 start time, e.g. 2026-10-06T14:00:00Z'),
       duration_minutes: z.number().int().min(15).max(480).default(30),
-      attendees: z.array(z.string().max(120)).max(20).default([]).describe('Email addresses'),
+      attendees: z.array(z.string().max(120)).max(20).default([]).describe('Kestrel colleagues by id or name (sam, Tara Lindqvist), or CRM contacts by email address'),
       description: z.string().max(2000).default(''),
       company: z.string().regex(/^C-\d{4}$/).optional(),
       idempotency_key: idempotencyKey,
@@ -197,10 +217,11 @@ export function workspaceTools(): AnyToolSpec[] {
     annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
     async handler(args, ctx) {
       const owner = await employee(ctx.db, ctx.actor.userId);
-      await checkRecipients(ctx.db, args.attendees);
+      const invited = await resolveAddresses(ctx.db, args.attendees);
+      await checkRecipients(ctx.db, invited);
       const startMs = Date.parse(args.start);
       if (startMs < Date.parse(nowIso()) - 60_000) throw new ToolError('the start time is in the past');
-      const attendees = [...new Set([owner.email, ...args.attendees.map((a) => a.toLowerCase())])];
+      const attendees = [...new Set([owner.email, ...invited])];
       const { result, replayed } = await withIdempotency(
         ctx.db,
         { tool: 'calendar_create_event', key: args.idempotency_key, args, actor: ctx.actor.userId },
@@ -229,7 +250,7 @@ export function workspaceTools(): AnyToolSpec[] {
     scope: 'email:draft',
     write: true,
     input: z.object({
-      to: z.array(z.string().max(120)).min(1).max(10),
+      to: z.array(z.string().max(120)).min(1).max(10).describe('CRM contacts by email address, or Kestrel colleagues by id, name or email'),
       cc: z.array(z.string().max(120)).max(10).default([]),
       subject: z.string().min(1).max(200),
       body: z.string().min(1).max(8000),
@@ -240,7 +261,9 @@ export function workspaceTools(): AnyToolSpec[] {
     output: z.object({ email, recipients: z.object({ internal: z.array(z.string()), external: z.array(z.string()) }), replayed: z.boolean() }),
     annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
     async handler(args, ctx) {
-      const recipients = await checkRecipients(ctx.db, [...args.to, ...args.cc]);
+      const to = await resolveAddresses(ctx.db, args.to);
+      const cc = await resolveAddresses(ctx.db, args.cc);
+      const recipients = await checkRecipients(ctx.db, [...to, ...cc]);
       const { result, replayed } = await withIdempotency(
         ctx.db,
         { tool: 'email_draft', key: args.idempotency_key, args, actor: ctx.actor.userId },
@@ -249,7 +272,7 @@ export function workspaceTools(): AnyToolSpec[] {
             client,
             `INSERT INTO workspace.emails (id, author_id, to_addresses, cc_addresses, subject, body, status, related_ticket, related_deal, created_at)
              VALUES ('M-' || nextval('workspace.email_seq'), $1, $2, $3, $4, $5, 'draft', $6, $7, $8) RETURNING id`,
-            [ctx.actor.userId, args.to.map((a) => a.toLowerCase()), args.cc.map((a) => a.toLowerCase()), args.subject, args.body, args.related_ticket ?? null, args.related_deal ?? null, nowIso()],
+            [ctx.actor.userId, to, cc, args.subject, args.body, args.related_ticket ?? null, args.related_deal ?? null, nowIso()],
           );
           const created = await queryOne<z.infer<typeof email>>(client, `${EMAIL_SELECT} WHERE m.id = $1`, [row?.id]);
           if (!created) throw new ToolError('draft was not created');

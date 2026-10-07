@@ -5,6 +5,7 @@
 export const SCOPES = {
   'crm:read': 'Read companies and contacts',
   'crm:deals': 'Read deals, notes and the pipeline',
+  'contacts:pii': "See customer contacts' email addresses and phone numbers (personal data)",
   'crm:write': 'Update deal stages and add notes',
   'helpdesk:read': 'Read tickets and comments',
   'helpdesk:write': 'Comment on, update, assign and create tickets',

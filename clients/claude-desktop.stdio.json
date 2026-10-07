@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "switchboard": {
+      "command": "node",
+      "args": ["/absolute/path/to/mcp-company-connectors/packages/cli/dist/main.js", "gateway", "--stdio"],
+      "env": {
+        "DATABASE_URL": "postgresql://switchboard:switchboard@127.0.0.1:55480/switchboard",
+        "SWITCHBOARD_TOKEN": "<paste the output of: node packages/cli/dist/main.js token --user sam --ttl 86400>"
+      }
+    }
+  }
+}

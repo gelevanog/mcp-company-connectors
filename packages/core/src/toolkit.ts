@@ -87,8 +87,8 @@ export function registerTools(server: McpServer, specs: AnyToolSpec[], options: 
       {
         title: spec.title,
         description: spec.description,
-        inputSchema: spec.input,
-        outputSchema: spec.output,
+        inputSchema: spec.input as z.ZodObject,
+        outputSchema: spec.output as z.ZodType,
         annotations: spec.annotations,
         _meta: {
           [META.scope]: spec.scope,
@@ -133,6 +133,26 @@ export function registerTools(server: McpServer, specs: AnyToolSpec[], options: 
 /** Escape LIKE wildcards in user-supplied search text. */
 export function likePattern(text: string): string {
   return `%${text.replace(/[\\%_]/g, (match) => `\\${match}`)}%`;
+}
+
+/**
+ * Every word of the query must appear in at least one of the columns (case-insensitive), so "VAT invoice"
+ * finds "Invoice 2026-09 shows the wrong VAT rate". Pushes the parameters and returns the SQL condition.
+ */
+export function wordsMatch(columns: string[], query: string, params: unknown[]): string {
+  const words = query
+    .split(/\s+/)
+    .map((word) => word.replace(/^[^\p{L}\p{N}@]+|[^\p{L}\p{N}]+$/gu, ''))
+    .filter((word) => word.length > 0)
+    .slice(0, 8);
+  if (words.length === 0) return 'TRUE';
+  return words
+    .map((word) => {
+      params.push(likePattern(word));
+      const placeholder = `$${params.length}`;
+      return `(${columns.map((column) => `${column} ILIKE ${placeholder}`).join(' OR ')})`;
+    })
+    .join(' AND ');
 }
 
 /** Opaque, tamper-evident-enough pagination cursor for list tools (an offset; never trusted beyond bounds). */

@@ -115,7 +115,7 @@ export function analyticsTools(options: AnalyticsServerOptions): AnyToolSpec[] {
       rules: z.array(z.string()),
     }),
     annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: false },
-    async handler(_args, ctx) {
+    async handler() {
       const columns = await queryRows<ColumnInfo>(
         options.db,
         `SELECT table_schema || '.' || table_name AS table, column_name AS column, data_type AS type
@@ -132,7 +132,6 @@ export function analyticsTools(options: AnalyticsServerOptions): AnyToolSpec[] {
           unavailable_columns: spec.denied,
         });
       }
-      void ctx;
       return {
         data: {
           today: today(),

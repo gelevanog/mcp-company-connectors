@@ -338,7 +338,6 @@ const NAME_B = ['Services', 'Group', 'Facilities', 'Networks', 'Energy', 'System
 const FIRST = ['Olivia', 'Liam', 'Emma', 'Noah', 'Ava', 'Mateo', 'Sofia', 'Lucas', 'Mia', 'Ethan', 'Chloe', 'Arjun', 'Yuki', 'Fatima', 'Lars', 'Ines', 'Diego', 'Hana', 'Omar', 'Nina', 'Pavel', 'Zara', 'Felix', 'Leila'];
 const LAST = ['Smith', 'Kowalski', 'Haddad', 'Johansson', 'Rossi', 'Kim', 'Okoye', 'Martin', 'Novak', 'Ferreira', 'Suzuki', 'Andersen', 'Garcia', 'Murphy', 'Schmidt', 'Costa', 'Ivanova', 'Dubois', 'Patel', 'Larsen'];
 const TITLES = ['Operations Manager', 'IT Director', 'Dispatch Lead', 'Procurement Manager', 'CFO', 'Field Service Director', 'Head of Customer Success', 'Systems Administrator'];
-const REGIONS = ['AMER', 'EMEA', 'APAC'] as const;
 const PHONE_PREFIX: Record<string, string> = { AMER: '+1 415 555', EMEA: '+44 20 5550', APAC: '+61 2 5550' };
 
 const TICKET_TEMPLATES: { subject: string; body: string; priority: string }[] = [
@@ -384,7 +383,7 @@ export function generateDemoData(seed = 7): DemoData {
   // Filler companies and contacts.
   const usedNames = new Set(companies.map((company) => company.name));
   for (let index = 7; index <= 60; index += 1) {
-    let name = '';
+    let name: string;
     do {
       name = `${rng.pick(NAME_A)} ${rng.pick(NAME_B)}`;
     } while (usedNames.has(name));

@@ -113,6 +113,13 @@ export async function createGateway(options: CreateGatewayOptions): Promise<Gate
     const status = deps.upstreams.current.status;
     return c.json({ ok: true, upstreams: status });
   });
+  app.get('/favicon.ico', (c) =>
+    c.body(
+      '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><rect x="2" y="2" width="28" height="28" rx="7" fill="#101820"/><g fill="#0f9f8e"><circle cx="10" cy="11" r="2.6"/><circle cx="22" cy="11" r="2.6"/><circle cx="10" cy="21" r="2.6"/><circle cx="22" cy="21" r="2.6"/></g></svg>',
+      200,
+      { 'content-type': 'image/svg+xml', 'cache-control': 'public, max-age=86400' },
+    ),
+  );
   app.get('/', (c) =>
     c.json({
       name: 'Switchboard MCP gateway',

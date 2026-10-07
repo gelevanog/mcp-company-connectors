@@ -69,6 +69,20 @@ describe.skipIf(!available)('security: roles, confirmations, idempotency, inject
       await sales.c.close();
     });
 
+    it('contact emails and phone numbers reach only roles with contacts:pii (analysts get the rest)', async () => {
+      const analyst = await client(stack, 'ana');
+      const asAnalyst = (await analyst.c.callTool({ name: 'crm_get_company', arguments: { company: 'C-1001' } })).structuredContent as { personal_data_visible: boolean; contacts: { email: string | null; phone: string | null }[] };
+      expect(asAnalyst.personal_data_visible).toBe(false);
+      expect(asAnalyst.contacts.every((c) => c.email === null && c.phone === null)).toBe(true);
+      const ticket = (await analyst.c.callTool({ name: 'helpdesk_get_ticket', arguments: { ticket_id: 'T-1187' } })).structuredContent as { ticket: { requester_email: string | null } };
+      expect(ticket.ticket.requester_email).toBeNull();
+      const sales = await client(stack, 'alice');
+      const asSales = (await sales.c.callTool({ name: 'crm_get_company', arguments: { company: 'C-1001' } })).structuredContent as { contacts: { email: string | null }[] };
+      expect(asSales.contacts[0]?.email).toContain('@acme-logistics.example');
+      await analyst.c.close();
+      await sales.c.close();
+    });
+
     it('analysts are read-only: no write tool is listed or callable', async () => {
       const { c } = await client(stack, 'ana', { elicit: 'accept' });
       const tools = (await c.listTools()).tools;

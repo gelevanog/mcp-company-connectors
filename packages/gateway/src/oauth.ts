@@ -153,8 +153,9 @@ export function oauthRoutes(deps: OAuthDeps): Hono {
 
   app.post('/oauth/authorize/decision', async (c) => {
     const form = await c.req.parseBody();
-    const encoded = String(form.request ?? '');
-    const signature = String(form.signature ?? '');
+    const text = (value: unknown) => (typeof value === 'string' ? value : '');
+    const encoded = text(form.request);
+    const signature = text(form.signature);
     const expected = sign(encoded);
     if (signature.length !== expected.length || !timingSafeEqual(Buffer.from(signature), Buffer.from(expected))) {
       return c.html(errorPage('Invalid request', 'The sign-in form was modified or is too old. Start again from your application.'), 400);
@@ -169,7 +170,7 @@ export function oauthRoutes(deps: OAuthDeps): Hono {
       url.searchParams.set('error_description', 'the user denied access');
       return c.redirect(url.toString(), 302);
     }
-    const user = await queryOne<{ id: string; role: string }>(db, 'SELECT id, role FROM core.employees WHERE id = $1 AND can_sign_in', [String(form.user ?? '')]);
+    const user = await queryOne<{ id: string; role: string }>(db, 'SELECT id, role FROM core.employees WHERE id = $1 AND can_sign_in', [text(form.user)]);
     if (!user) return c.html(errorPage('Unknown user', 'Pick one of the listed users.'), 400);
     const tenant = config.tenants[config.defaultTenant];
     if (!tenant) throw new Error('tenant not configured');
@@ -192,7 +193,7 @@ export function oauthRoutes(deps: OAuthDeps): Hono {
 
   app.post('/oauth/token', async (c) => {
     const form = await c.req.parseBody();
-    const field = (name: string) => (typeof form[name] === 'string' ? (form[name] as string) : undefined);
+    const field = (name: string) => (typeof form[name] === 'string' ? (form[name]) : undefined);
     let clientId = field('client_id');
     let secret = field('client_secret');
     const basic = c.req.header('authorization');

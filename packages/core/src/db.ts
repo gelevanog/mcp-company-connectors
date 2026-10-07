@@ -1,11 +1,11 @@
 import pg from 'pg';
 
 // Numbers come back as numbers, timestamps as ISO strings, dates as YYYY-MM-DD: JSON-friendly tool results.
-pg.types.setTypeParser(1700, (value) => Number.parseFloat(value)); // numeric
-pg.types.setTypeParser(20, (value) => Number.parseInt(value, 10)); // int8
-pg.types.setTypeParser(1184, (value) => new Date(value).toISOString()); // timestamptz
-pg.types.setTypeParser(1114, (value) => new Date(`${value}Z`).toISOString()); // timestamp
-pg.types.setTypeParser(1082, (value) => value); // date
+pg.types.setTypeParser(pg.types.builtins.NUMERIC, (value) => Number.parseFloat(value)); // numeric
+pg.types.setTypeParser(pg.types.builtins.INT8, (value) => Number.parseInt(value, 10)); // int8
+pg.types.setTypeParser(pg.types.builtins.TIMESTAMPTZ, (value) => new Date(value).toISOString()); // timestamptz
+pg.types.setTypeParser(pg.types.builtins.TIMESTAMP, (value) => new Date(`${value}Z`).toISOString()); // timestamp
+pg.types.setTypeParser(pg.types.builtins.DATE, (value) => value); // date
 
 export type Db = pg.Pool;
 export type DbClient = pg.PoolClient;

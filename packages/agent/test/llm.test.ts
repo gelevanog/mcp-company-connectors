@@ -33,7 +33,7 @@ describe('free-only guard', () => {
       apiKey: 'test',
       reasoningEffort: 'low',
       fetch: async (_url, init) => {
-        sent = JSON.parse(String(init?.body)) as Record<string, unknown>;
+        sent = JSON.parse(typeof init?.body === 'string' ? init.body : '{}') as Record<string, unknown>;
         return reply('c/d:free');
       },
     });

@@ -37,7 +37,7 @@ export interface Stack {
   close: () => Promise<void>;
 }
 
-const MCP_SCOPES = ['crm:read', 'crm:deals', 'crm:write', 'helpdesk:read', 'helpdesk:write', 'analytics:query', 'kb:read', 'calendar:read', 'calendar:write', 'email:draft', 'email:send'];
+const MCP_SCOPES = ['crm:read', 'crm:deals', 'contacts:pii', 'crm:write', 'helpdesk:read', 'helpdesk:write', 'analytics:query', 'kb:read', 'calendar:read', 'calendar:write', 'email:draft', 'email:send'];
 
 /** The five servers and the gateway on free ports, in this process (tests and the evaluation). */
 export async function startStack(options: StackOptions): Promise<Stack> {

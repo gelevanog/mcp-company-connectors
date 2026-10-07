@@ -15,11 +15,16 @@ export default tseslint.config(
       '@typescript-eslint/no-confusing-void-expression': 'off',
       '@typescript-eslint/no-unnecessary-condition': 'off',
       '@typescript-eslint/no-non-null-assertion': 'error',
+      // `(await c.req.json()) as Body` reads better than a type argument; keep assertions where they document intent.
+      '@typescript-eslint/no-unnecessary-type-assertion': 'off',
       '@typescript-eslint/no-misused-promises': ['error', { checksVoidReturn: false }],
+      // MCP handlers and callbacks are async by contract even when they do not await.
+      '@typescript-eslint/require-await': 'off',
     },
   },
   {
     files: ['packages/*/test/**/*.ts'],
+    languageOptions: { parserOptions: { projectService: false, project: ['./tsconfig.test.json'], tsconfigRootDir: import.meta.dirname } },
     rules: {
       '@typescript-eslint/no-unsafe-assignment': 'off',
       '@typescript-eslint/no-unsafe-member-access': 'off',

@@ -90,6 +90,20 @@ describe.skipIf(!available)('tool contracts (every server, every tool)', () => {
     });
   }
 
+  it('search matches every word of a multi-word query', async () => {
+    const helpdesk = clients.get('helpdesk');
+    const result = await helpdesk?.callTool({ name: 'helpdesk_search_tickets', arguments: { query: 'VAT invoice', company: 'ACME Logistics' } });
+    expect((result?.structuredContent as { tickets: { id: string }[] }).tickets.map((t) => t.id)).toEqual(['T-1003']);
+  });
+
+  it('accepts colleagues by id or name as invitees and recipients', async () => {
+    const workspace = clients.get('workspace');
+    const result = await workspace?.callTool({ name: 'calendar_create_event', arguments: { title: 'Rollout check', start: '2026-10-08T10:00:00Z', attendees: ['sam', 'Tara Lindqvist'] } });
+    expect((result?.structuredContent as { event: { attendees: string[] } }).event.attendees).toEqual(['adam@kestrel.example', 'sam@kestrel.example', 'tara@kestrel.example']);
+    const unknown = await workspace?.callTool({ name: 'email_draft', arguments: { to: ['nobody-by-that-name'], subject: 'x', body: 'y' } });
+    expect(unknown?.isError).toBe(true);
+  });
+
   it('rejects arguments that break the input schema before the handler runs', async () => {
     const crm = clients.get('crm');
     const result = await crm?.callTool({ name: 'crm_update_deal_stage', arguments: { deal_id: 'D-3001', stage: 'closed-ish' } });

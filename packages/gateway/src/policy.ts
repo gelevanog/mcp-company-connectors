@@ -96,7 +96,7 @@ export function roleAccess(tenant: string, config: TenantConfig, overrides: Over
 
 export function confirmationRule(config: TenantConfig, tool: string): ConfirmationConfig {
   const specific = config.confirmations.tools[tool];
-  return { ...config.confirmations.default, ...(specific ?? {}) } as ConfirmationConfig;
+  return { ...config.confirmations.default, ...(specific ?? {}) };
 }
 
 /** The scopes a token gets: what the client asked for, limited to the role. No scope asked = everything the role has. */

@@ -1,0 +1,9 @@
+{
+  "mcpServers": {
+    "kestrel-knowledge-base": {
+      "command": "node",
+      "args": ["/absolute/path/to/mcp-company-connectors/packages/cli/dist/main.js", "serve", "kb", "--stdio"],
+      "env": { "DATABASE_URL": "postgresql://switchboard:switchboard@127.0.0.1:55480/switchboard" }
+    }
+  }
+}

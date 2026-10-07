@@ -85,7 +85,7 @@ export function registerEvalCommands(program: Command): void {
           });
           const call = completion.message.tool_calls?.[0];
           const args = call ? (JSON.parse(call.function.arguments || '{}') as Record<string, unknown>) : {};
-          const ok = call?.function.name === 'helpdesk_search_tickets' && /acme/i.test(String(args.company ?? ''));
+          const ok = call?.function.name === 'helpdesk_search_tickets' && /acme/i.test(typeof args.company === 'string' ? args.company : '');
           results.push({ model: id, ok, served: completion.model, tool_call: call?.function ?? null, latency_s: (Date.now() - started) / 1000 });
           console.log(`${ok ? 'ok  ' : 'FAIL'} ${id} ${((Date.now() - started) / 1000).toFixed(1)} s ${call ? call.function.arguments : completion.message.content?.slice(0, 80)}`);
         } catch (error) {
@@ -201,18 +201,19 @@ export function registerEvalCommands(program: Command): void {
       const path = ledgerPath();
       const rows = existsSync(path) ? readFileSync(path, 'utf8').split('\n').filter(Boolean).map((line) => JSON.parse(line) as Record<string, unknown>) : [];
       const count = (key: string) => rows.reduce<Record<string, number>>((acc, row) => {
-        const value = String(row[key] ?? '');
+        const raw = row[key];
+        const value = typeof raw === 'string' ? raw : JSON.stringify(raw ?? '');
         acc[value] = (acc[value] ?? 0) + 1;
         return acc;
       }, {});
-      const requested = [...new Set(rows.flatMap((row) => [String(row.requested_model ?? ''), ...((row.fallback_models as string[] | undefined) ?? [])]).filter(Boolean))].sort();
+      const requested = [...new Set(rows.flatMap((row) => [typeof row.requested_model === 'string' ? row.requested_model : '', ...((row.fallback_models as string[] | undefined) ?? [])]).filter(Boolean))].sort();
       const served = rows.filter((row) => row.served_model).reduce<Record<string, number>>((acc, row) => {
         const id = String(row.served_model);
         acc[id] = (acc[id] ?? 0) + 1;
         return acc;
       }, {});
       const tagGroup = rows.reduce<Record<string, number>>((acc, row) => {
-        const tag = String(row.tag ?? '').split(':').slice(0, 2).join(':');
+        const tag = (typeof row.tag === 'string' ? row.tag : '').split(':').slice(0, 2).join(':');
         acc[tag] = (acc[tag] ?? 0) + 1;
         return acc;
       }, {});

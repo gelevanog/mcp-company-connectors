@@ -7,7 +7,9 @@ import { randomBytes } from 'node:crypto';
  * the assistant, and remembers which email addresses came from it.
  */
 
-const HIDDEN = /[​-‏‪-‮⁠-⁤⁦-⁩﻿\u{E0000}-\u{E007F}]/gu;
+/** Zero-width characters, bidi controls, word joiners, the BOM and Unicode tag characters ("ASCII smuggling"). */
+const HIDDEN_RANGES: [number, number][] = [[0x200b, 0x200f], [0x202a, 0x202e], [0x2060, 0x2064], [0x2066, 0x2069], [0xfeff, 0xfeff], [0xe0000, 0xe007f]];
+const HIDDEN = new RegExp(`[${HIDDEN_RANGES.map(([from, to]) => `${String.fromCodePoint(from)}-${String.fromCodePoint(to)}`).join('')}]`, 'gu');
 const EMAIL = /[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/g;
 
 export interface InjectionFinding {
@@ -79,7 +81,7 @@ export function wrapText(text: string, source: string, id: string, findings: Inj
 
 /** Wrap every string a pointer names; returns a deep copy. */
 export function wrapUntrusted(value: unknown, pointers: string[], source: string): WrapResult {
-  const copy = structuredClone(value) as unknown;
+  const copy: unknown = structuredClone(value);
   const fields: WrappedField[] = [];
   const id = markerId();
   for (const pointer of pointers) {
