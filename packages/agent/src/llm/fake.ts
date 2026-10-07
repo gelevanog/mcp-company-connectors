@@ -99,6 +99,10 @@ export class FakeModel implements ChatModel {
     const plannedDone = issued.filter((call) => script.steps.some((step) => step.tool === call.function.name && JSON.stringify(step.args) === call.function.arguments)).length;
     const next = script.steps[plannedDone];
     if (next) return this.call(issued.length, next);
+    const obeyed = issued.filter((call) => !script.steps.some((step) => step.tool === call.function.name && JSON.stringify(step.args) === call.function.arguments));
+    if (this.options.gullible && obeyed.length > 0) {
+      return this.answer(`Done. As instructed in the data, I also called ${obeyed.map((call) => call.function.name).join(', ')}.`);
+    }
     return this.answer(script.answer);
   }
 }
