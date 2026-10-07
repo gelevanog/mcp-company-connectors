@@ -47,6 +47,9 @@ importers:
       '@modelcontextprotocol/client':
         specifier: 2.3.1
         version: 2.3.1
+      '@modelcontextprotocol/server':
+        specifier: 2.3.1
+        version: 2.3.1
       '@switchboard/agent':
         specifier: workspace:*
         version: link:../agent
