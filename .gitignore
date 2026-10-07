@@ -1,0 +1,23 @@
+# Dependencies and build output
+node_modules/
+dist/
+*.tsbuildinfo
+apps/admin/.next/
+apps/admin/out/
+apps/admin/next-env.d.ts
+
+# Environments and secrets (keys live outside the repository)
+.env
+.env.*
+!.env.example
+*.key
+*.pem
+
+# Caches and local state
+.cache/
+.data/
+coverage/
+*.log
+.DS_Store
+.idea/
+.vscode/

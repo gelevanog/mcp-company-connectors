@@ -1,0 +1,6 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": { "rootDir": "src", "outDir": "dist", "tsBuildInfoFile": "dist/.tsbuildinfo" },
+  "include": ["src"],
+  "references": [{ "path": "../core" }, { "path": "../agent" }, { "path": "../gateway" }, { "path": "../server-crm" }, { "path": "../server-helpdesk" }, { "path": "../server-analytics" }, { "path": "../server-kb" }, { "path": "../server-workspace" }]
+}

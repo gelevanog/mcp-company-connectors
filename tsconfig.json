@@ -1,0 +1,14 @@
+{
+  "files": [],
+  "references": [
+    { "path": "packages/core" },
+    { "path": "packages/server-crm" },
+    { "path": "packages/server-helpdesk" },
+    { "path": "packages/server-analytics" },
+    { "path": "packages/server-kb" },
+    { "path": "packages/server-workspace" },
+    { "path": "packages/agent" },
+    { "path": "packages/gateway" },
+    { "path": "packages/cli" }
+  ]
+}

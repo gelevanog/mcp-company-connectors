@@ -1,0 +1,32 @@
+{
+  "name": "@switchboard/cli",
+  "version": "0.1.0",
+  "private": true,
+  "license": "MIT",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "dependencies": {
+    "@modelcontextprotocol/client": "2.3.1",
+    "@switchboard/agent": "workspace:*",
+    "@switchboard/core": "workspace:*",
+    "@switchboard/gateway": "workspace:*",
+    "@switchboard/server-analytics": "workspace:*",
+    "@switchboard/server-crm": "workspace:*",
+    "@switchboard/server-helpdesk": "workspace:*",
+    "@switchboard/server-kb": "workspace:*",
+    "@switchboard/server-workspace": "workspace:*",
+    "commander": "^15.0.0",
+    "yaml": "^2.9.1",
+    "zod": "^4.6.5"
+  },
+  "bin": {
+    "switchboard": "./dist/main.js"
+  }
+}
