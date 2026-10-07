@@ -29,5 +29,8 @@
   },
   "bin": {
     "switchboard": "./dist/main.js"
+  },
+  "devDependencies": {
+    "jose": "^6.2.12"
   }
 }

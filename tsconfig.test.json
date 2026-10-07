@@ -1,0 +1,22 @@
+{
+  "extends": "./tsconfig.base.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "composite": false,
+    "declaration": false,
+    "declarationMap": false,
+    "rootDir": ".",
+    "paths": {
+      "@switchboard/core": ["./packages/core/src/index.ts"],
+      "@switchboard/server-crm": ["./packages/server-crm/src/index.ts"],
+      "@switchboard/server-helpdesk": ["./packages/server-helpdesk/src/index.ts"],
+      "@switchboard/server-analytics": ["./packages/server-analytics/src/index.ts"],
+      "@switchboard/server-kb": ["./packages/server-kb/src/index.ts"],
+      "@switchboard/server-workspace": ["./packages/server-workspace/src/index.ts"],
+      "@switchboard/agent": ["./packages/agent/src/index.ts"],
+      "@switchboard/gateway": ["./packages/gateway/src/index.ts"],
+      "@switchboard/cli": ["./packages/cli/src/index.ts"]
+    }
+  },
+  "include": ["packages/*/test/**/*.ts", "vitest.config.ts"]
+}

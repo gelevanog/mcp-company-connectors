@@ -83,6 +83,10 @@ importers:
       zod:
         specifier: ^4.6.5
         version: 4.6.5
+    devDependencies:
+      jose:
+        specifier: ^6.2.12
+        version: 6.2.12
 
   packages/core:
     dependencies:
