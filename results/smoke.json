@@ -1,0 +1,81 @@
+{
+  "date": "2026-10-07T10:45:49.962Z",
+  "results": [
+    {
+      "model": "nvidia/nemotron-3-super-120b-a12b:free",
+      "ok": true,
+      "served": "nvidia/nemotron-3-super-120b-a12b:free",
+      "tool_call": {
+        "name": "helpdesk_search_tickets",
+        "arguments": "{\"company\":\"ACME Logistics\",\"status\":[\"open\"]}"
+      },
+      "latency_s": 2.2
+    },
+    {
+      "model": "nvidia/nemotron-3-ultra-550b-a55b:free",
+      "ok": true,
+      "served": "nvidia/nemotron-3-ultra-550b-a55b:free",
+      "tool_call": {
+        "name": "helpdesk_search_tickets",
+        "arguments": "{\"company\":\"ACME Logistics\",\"status\":[\"open\"]}"
+      },
+      "latency_s": 9.967
+    },
+    {
+      "model": "dots-studio/dots-3-note-preview:free",
+      "ok": true,
+      "served": "dots-studio/dots-3-note-preview:free",
+      "tool_call": {
+        "name": "helpdesk_search_tickets",
+        "arguments": "{\"company\": \"ACME Logistics\", \"status\": [\"open\"]}"
+      },
+      "latency_s": 2.907
+    },
+    {
+      "model": "inclusionai/ling-3.0-flash-sante:free",
+      "ok": true,
+      "served": "inclusionai/ling-3.0-flash-sante:free",
+      "tool_call": {
+        "name": "helpdesk_search_tickets",
+        "arguments": "{\"company\": \"ACME Logistics\", \"status\": [\"open\"]}"
+      },
+      "latency_s": 1.581
+    },
+    {
+      "model": "nvidia/nemotron-3.5-lightning:free",
+      "ok": true,
+      "served": "nvidia/nemotron-3.5-lightning:free",
+      "tool_call": {
+        "name": "helpdesk_search_tickets",
+        "arguments": "{\"status\":[\"open\"],\"company\":\"ACME Logistics\"}"
+      },
+      "latency_s": 3.712
+    },
+    {
+      "model": "thinkingmachines/inkling:free",
+      "ok": false,
+      "error": "upstream 403: {\"error\":{\"message\":\"thinkingmachines/inkling:free is only available on agentic harnesses. Try plugging it into a coding agent or productivity app listed on https://openrouter.ai/apps\",\"",
+      "latency_s": 1.478
+    },
+    {
+      "model": "google/gemma-4-31b-it:free",
+      "ok": true,
+      "served": "google/gemma-4-31b-it:free",
+      "tool_call": {
+        "name": "helpdesk_search_tickets",
+        "arguments": "{\"company\":\"ACME Logistics\",\"status\":[\"open\"]}"
+      },
+      "latency_s": 6.921
+    },
+    {
+      "model": "apodex/apodex-1.1-mini:free",
+      "ok": true,
+      "served": "apodex/apodex-1.1-mini:free",
+      "tool_call": {
+        "name": "helpdesk_search_tickets",
+        "arguments": "{\"company\": \"ACME Logistics\", \"status\": [\"open\"]}"
+      },
+      "latency_s": 1.739
+    }
+  ]
+}
