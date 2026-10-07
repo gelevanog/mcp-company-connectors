@@ -1,7 +1,7 @@
 {
-  "total_requests": 364,
+  "total_requests": 403,
   "by_status": {
-    "ok": 356,
+    "ok": 395,
     "error": 2,
     "retryable_error": 6
   },
@@ -19,7 +19,11 @@
     "eval:ablation_all_tools": 70,
     "eval:model_ling_3_flash": 49,
     "eval:model_dots_3": 59,
-    "eval:main_rerun": 16
+    "eval:main_rerun": 16,
+    "eval:model_ling_3_flash_rerun": 8,
+    "eval:model_dots_3_rerun": 8,
+    "eval:main_rerun_pii": 10,
+    "playground": 13
   },
   "requested_models": [
     "apodex/apodex-1.1-mini:free",
@@ -32,17 +36,17 @@
     "thinkingmachines/inkling:free"
   ],
   "served_models": {
-    "nvidia/nemotron-3-super-120b-a12b:free": 247,
+    "nvidia/nemotron-3-super-120b-a12b:free": 270,
     "nvidia/nemotron-3-ultra-550b-a55b:free": 1,
-    "dots-studio/dots-3-note-preview:free": 58,
-    "inclusionai/ling-3.0-flash-sante:free": 47,
+    "dots-studio/dots-3-note-preview:free": 66,
+    "inclusionai/ling-3.0-flash-sante:free": 55,
     "nvidia/nemotron-3.5-lightning:free": 1,
     "google/gemma-4-31b-it:free": 1,
     "apodex/apodex-1.1-mini:free": 1
   },
   "all_model_ids_free": true,
-  "input_tokens": 2632937,
-  "output_tokens": 89703,
+  "input_tokens": 3132875,
+  "output_tokens": 99322,
   "first_call": "2026-10-07T10:45:21Z",
-  "last_call": "2026-10-07T11:16:09Z"
+  "last_call": "2026-10-07T11:24:44Z"
 }

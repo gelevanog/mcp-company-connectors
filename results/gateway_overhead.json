@@ -1,0 +1,12 @@
+{
+  "calls": 100,
+  "tool": "helpdesk_get_ticket (one ticket, untrusted body wrapped by the gateway)",
+  "direct_ms": {
+    "p50": 4,
+    "p95": 4.8
+  },
+  "gateway_ms": {
+    "p50": 8,
+    "p95": 10.2
+  }
+}
