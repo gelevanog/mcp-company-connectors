@@ -1,0 +1,127 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+env:
+  NEXT_TELEMETRY_DISABLED: "1"
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint:
+    name: Lint and typecheck
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+
+      - name: Install pnpm (version from packageManager)
+        uses: pnpm/action-setup@v6
+
+      - name: Install Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build packages
+        run: pnpm build
+
+      - name: ESLint (typed rules, packages and admin console)
+        run: pnpm lint
+
+      - name: Type check (packages, tests, admin console)
+        run: pnpm typecheck
+
+      - name: Build the admin console
+        run: pnpm --filter @switchboard/admin build
+
+  test:
+    name: Tests (MCP integration, security, contracts, agent loop)
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: switchboard
+          POSTGRES_PASSWORD: switchboard
+          POSTGRES_DB: switchboard_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U switchboard"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      # No API keys: the agent-loop tests use the deterministic offline model.
+      TEST_DATABASE_URL: postgresql://switchboard:switchboard@localhost:5432/switchboard_test
+      DATABASE_URL: postgresql://switchboard:switchboard@localhost:5432/switchboard_test
+      REQUIRE_TEST_DB: "1"
+      SWITCHBOARD_LLM_LEDGER: ""
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+
+      - name: Install pnpm (version from packageManager)
+        uses: pnpm/action-setup@v6
+
+      - name: Install Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build packages
+        run: pnpm build
+
+      - name: Run tests
+        run: pnpm test
+
+      - name: Offline evaluation (every task with its reference plan, no API calls)
+        env:
+          EVAL_DATABASE_URL: postgresql://switchboard:switchboard@localhost:5432/switchboard_test
+          SWITCHBOARD_RESULTS_DIR: /tmp/results
+          SWITCHBOARD_LOG: silent
+        run: node packages/cli/dist/main.js eval run --name offline --provider fake
+
+  docker:
+    name: Docker build
+    runs-on: ubuntu-latest
+    needs: [lint, test]
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4
+
+      - name: Build the gateway and servers image (no push)
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          push: false
+          tags: switchboard:ci
+          cache-from: type=gha,scope=switchboard
+          cache-to: type=gha,mode=max,scope=switchboard
+
+      - name: Build the admin console image (no push)
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          file: apps/admin/Dockerfile
+          push: false
+          tags: switchboard-admin:ci
+          cache-from: type=gha,scope=admin
+          cache-to: type=gha,mode=max,scope=admin

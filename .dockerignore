@@ -1,0 +1,11 @@
+**/node_modules
+**/dist
+**/.next
+**/*.tsbuildinfo
+.git
+.cache
+.env
+.env.*
+!.env.example
+docs
+apps/admin/next-env.d.ts

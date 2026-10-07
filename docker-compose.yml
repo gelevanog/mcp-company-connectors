@@ -1,0 +1,140 @@
+# Switchboard: PostgreSQL with the Kestrel Cloud demo data, five MCP servers, the gateway and the admin console.
+#   docker compose up --build    -> console http://localhost:3000 (sign in as Adam), MCP endpoint http://localhost:8080/mcp
+# Without keys the playground uses the offline demo model. For free cloud models put OPENROUTER_API_KEY and
+# SWITCHBOARD_PLAYGROUND_MODELS in .env (see .env.example).
+name: switchboard
+
+x-server: &server
+  image: switchboard:latest
+  depends_on:
+    seed:
+      condition: service_completed_successfully
+  environment: &server-env
+    DATABASE_URL: postgresql://switchboard:${POSTGRES_PASSWORD:-switchboard}@db:5432/switchboard
+    SWITCHBOARD_PUBLIC_URL: http://localhost:${GATEWAY_PORT:-8080}
+    SWITCHBOARD_GATEWAY_JWKS_URL: http://gateway:8080/oauth/jwks.json
+    SWITCHBOARD_TODAY: ${SWITCHBOARD_TODAY:-2026-10-01}
+  restart: unless-stopped
+
+services:
+  db:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: switchboard
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-switchboard}
+      POSTGRES_DB: switchboard
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U switchboard -d switchboard"]
+      interval: 3s
+      timeout: 3s
+      retries: 30
+    restart: unless-stopped
+
+  seed:
+    build: .
+    image: switchboard:latest
+    command: ["seed", "--if-empty"]
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://switchboard:${POSTGRES_PASSWORD:-switchboard}@db:5432/switchboard
+      ANALYTICS_DB_PASSWORD: ${ANALYTICS_DB_PASSWORD:-switchboard_analytics}
+    restart: "no"
+
+  crm:
+    <<: *server
+    command: ["serve", "crm", "--host", "0.0.0.0", "--port", "7101"]
+    environment:
+      <<: *server-env
+      SWITCHBOARD_SERVER_URL: http://crm:7101/mcp
+
+  helpdesk:
+    <<: *server
+    command: ["serve", "helpdesk", "--host", "0.0.0.0", "--port", "7102"]
+    environment:
+      <<: *server-env
+      SWITCHBOARD_SERVER_URL: http://helpdesk:7102/mcp
+
+  analytics:
+    <<: *server
+    command: ["serve", "analytics", "--host", "0.0.0.0", "--port", "7103"]
+    environment:
+      <<: *server-env
+      SWITCHBOARD_SERVER_URL: http://analytics:7103/mcp
+      ANALYTICS_DATABASE_URL: postgresql://switchboard_analytics:${ANALYTICS_DB_PASSWORD:-switchboard_analytics}@db:5432/switchboard
+
+  kb:
+    <<: *server
+    command: ["serve", "kb", "--host", "0.0.0.0", "--port", "7104"]
+    environment:
+      <<: *server-env
+      SWITCHBOARD_SERVER_URL: http://kb:7104/mcp
+
+  workspace:
+    <<: *server
+    command: ["serve", "workspace", "--host", "0.0.0.0", "--port", "7105"]
+    environment:
+      <<: *server-env
+      SWITCHBOARD_SERVER_URL: http://workspace:7105/mcp
+
+  gateway:
+    <<: *server
+    command: ["gateway", "--host", "0.0.0.0", "--port", "8080"]
+    depends_on:
+      seed:
+        condition: service_completed_successfully
+      crm:
+        condition: service_started
+      helpdesk:
+        condition: service_started
+      analytics:
+        condition: service_started
+      kb:
+        condition: service_started
+      workspace:
+        condition: service_started
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      <<: *server-env
+      SWITCHBOARD_INTERNAL_URL: http://127.0.0.1:8080/mcp
+      SWITCHBOARD_UPSTREAM_CRM_URL: http://crm:7101/mcp
+      SWITCHBOARD_UPSTREAM_HELPDESK_URL: http://helpdesk:7102/mcp
+      SWITCHBOARD_UPSTREAM_ANALYTICS_URL: http://analytics:7103/mcp
+      SWITCHBOARD_UPSTREAM_KB_URL: http://kb:7104/mcp
+      SWITCHBOARD_UPSTREAM_WORKSPACE_URL: http://workspace:7105/mcp
+      SWITCHBOARD_ADMIN_REDIRECT_URIS: http://localhost:${ADMIN_PORT:-3000}/auth/callback
+      SWITCHBOARD_ALLOWED_ORIGINS: http://localhost:${ADMIN_PORT:-3000},http://localhost:6274
+    volumes:
+      - llmcache:/app/.cache
+    ports:
+      - "${GATEWAY_PORT:-8080}:8080"
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:8080/healthz').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  admin:
+    build:
+      context: .
+      dockerfile: apps/admin/Dockerfile
+    image: switchboard-admin:latest
+    depends_on:
+      gateway:
+        condition: service_healthy
+    environment:
+      GATEWAY_INTERNAL_URL: http://gateway:8080
+      GATEWAY_PUBLIC_URL: http://localhost:${GATEWAY_PORT:-8080}
+      ADMIN_PUBLIC_URL: http://localhost:${ADMIN_PORT:-3000}
+    ports:
+      - "${ADMIN_PORT:-3000}:3000"
+    restart: unless-stopped
+
+volumes:
+  pgdata:
+  llmcache:
