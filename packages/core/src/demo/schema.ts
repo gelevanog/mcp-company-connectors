@@ -107,7 +107,7 @@ CREATE TABLE IF NOT EXISTS helpdesk.tickets (
   resolved_at           timestamptz
 );
 
-CREATE SEQUENCE IF NOT EXISTS helpdesk.comment_seq START 90001;
+CREATE SEQUENCE IF NOT EXISTS helpdesk.comment_seq START 91001;
 CREATE TABLE IF NOT EXISTS helpdesk.comments (
   id          text PRIMARY KEY,
   ticket_id   text NOT NULL REFERENCES helpdesk.tickets(id),
@@ -259,7 +259,7 @@ TRUNCATE workspace.sandbox_mailbox, workspace.emails, workspace.events,
 DELETE FROM core.employees;
 ALTER SEQUENCE crm.note_seq RESTART WITH 5001;
 ALTER SEQUENCE helpdesk.ticket_seq RESTART WITH 1300;
-ALTER SEQUENCE helpdesk.comment_seq RESTART WITH 90001;
+ALTER SEQUENCE helpdesk.comment_seq RESTART WITH 91001;
 ALTER SEQUENCE workspace.event_seq RESTART WITH 7001;
 ALTER SEQUENCE workspace.email_seq RESTART WITH 8001;
 `;

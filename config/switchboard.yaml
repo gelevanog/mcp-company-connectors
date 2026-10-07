@@ -1,0 +1,55 @@
+# Switchboard gateway policy. One block per tenant; the demo ships one tenant (Kestrel Cloud).
+# Upstream URLs can be overridden with SWITCHBOARD_UPSTREAM_<NAME>_URL (docker compose does this).
+tenants:
+  kestrel:
+    name: Kestrel Cloud
+    internal_domain: kestrel.example
+    upstreams:
+      crm: { url: http://127.0.0.1:7101/mcp, uri_schemes: [crm] }
+      helpdesk: { url: http://127.0.0.1:7102/mcp, uri_schemes: [helpdesk] }
+      analytics: { url: http://127.0.0.1:7103/mcp, uri_schemes: [] }
+      kb: { url: http://127.0.0.1:7104/mcp, uri_schemes: [kb] }
+      workspace: { url: http://127.0.0.1:7105/mcp, uri_schemes: [] }
+
+    # A role sees a tool when the tool matches one of its patterns AND the role holds the tool's scope.
+    # A user's token carries the scopes the client asked for, limited to the role's scopes.
+    roles:
+      sales:
+        description: Account executives. Full CRM, read-only helpdesk, calendar and email.
+        scopes: [crm:read, crm:deals, crm:write, helpdesk:read, kb:read, calendar:read, calendar:write, email:draft, email:send]
+        tools: ['crm_*', helpdesk_search_tickets, helpdesk_get_ticket, 'kb_*', 'calendar_*', 'email_*']
+      support:
+        description: Support engineers. Helpdesk, companies and contacts (no deals or pipeline), calendar and email.
+        scopes: [crm:read, helpdesk:read, helpdesk:write, kb:read, calendar:read, calendar:write, email:draft, email:send]
+        tools: [crm_search_companies, crm_get_company, crm_search_contacts, 'helpdesk_*', 'kb_*', 'calendar_*', 'email_*']
+      analyst:
+        description: Revenue analysts. Read-only everywhere, plus read-only SQL.
+        scopes: [crm:read, crm:deals, helpdesk:read, analytics:query, kb:read]
+        tools: ['analytics_*', crm_search_companies, crm_get_company, crm_search_deals, crm_get_deal, helpdesk_search_tickets, helpdesk_get_ticket, 'kb_*']
+      admin:
+        description: IT administrators. Every tool, and the admin console.
+        scopes: ['*']
+        tools: ['*']
+
+    # How writes are confirmed. elicit = ask the user through the client (MCP elicitation); clients that cannot
+    # elicit fall back to `token` (a single-use confirmation token the user must approve in the conversation) or
+    # `approval` (an admin approves in the Switchboard console before the call can run).
+    confirmations:
+      default: { mode: elicit, fallback: token, ttl_minutes: 10 }
+      tools:
+        crm_update_deal_stage: { mode: elicit, fallback: approval }
+        helpdesk_update_ticket: { mode: elicit, fallback: approval }
+        email_send: { mode: elicit, fallback: approval }
+
+    rate_limits:
+      default: { calls_per_minute: 60, writes_per_minute: 10 }
+      roles:
+        analyst: { calls_per_minute: 40, writes_per_minute: 0 }
+
+    untrusted:
+      # Wrap fields servers mark as written by customers or third parties, and look for injected instructions.
+      wrap: true
+      # After flagged content, the user's next writes need the stricter confirmation for this many minutes.
+      taint_window_minutes: 30
+      # Refuse email recipients and invitees that appeared only in untrusted content.
+      block_untrusted_recipients: true
