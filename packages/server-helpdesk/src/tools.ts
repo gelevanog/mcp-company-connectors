@@ -129,7 +129,7 @@ export async function loadTicket(ctx: Pick<ToolContext, 'db'>, id: string, actor
     [id.toUpperCase(), today()],
   );
   if (!ticket) throw new ToolError(`ticket ${id} not found`, 'not_found');
-  if (actor && !hasScope(actor, 'contacts:pii')) ticket.requester_email = null;
+  if (actor && !hasScope(actor, 'contacts:pii')) ticket.requester_email = 'withheld: personal data, not available to your role';
   const comments = await queryRows<z.infer<typeof comment>>(
     ctx.db,
     'SELECT id, author_type, author_name, internal, body, created_at FROM helpdesk.comments WHERE ticket_id = $1 ORDER BY created_at, id',

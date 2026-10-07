@@ -36,15 +36,20 @@ const contact = z.object({
   company_name: z.string(),
   name: z.string(),
   title: z.string(),
-  email: z.string().nullable().describe('null without the contacts:pii scope'),
-  phone: z.string().nullable().describe('null without the contacts:pii scope'),
+  email: z.string().describe('The address, or a "withheld" notice for roles without the contacts:pii scope'),
+  phone: z.string().describe('The number, or a "withheld" notice for roles without the contacts:pii scope'),
 });
 
 type ContactRow = z.infer<typeof contact>;
 
-/** Contact emails and phone numbers are personal data: only roles with contacts:pii see them. */
+export const WITHHELD = 'withheld: personal data, not available to your role';
+
+/**
+ * Contact emails and phone numbers are personal data: only roles with contacts:pii see them. The value says
+ * it was withheld (a null made models report "no email on file", which is wrong).
+ */
 export function redactContacts(ctx: Pick<ToolContext, 'actor'>, rows: ContactRow[]): ContactRow[] {
-  return hasScope(ctx.actor, 'contacts:pii') ? rows : rows.map((row) => ({ ...row, email: null, phone: null }));
+  return hasScope(ctx.actor, 'contacts:pii') ? rows : rows.map((row) => ({ ...row, email: WITHHELD, phone: WITHHELD }));
 }
 
 const dealSummary = z.object({
