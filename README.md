@@ -13,6 +13,10 @@
 ![Models](https://img.shields.io/badge/models-free%20via%20OpenRouter-2b8a3e)
 ![License: MIT](https://img.shields.io/badge/License-MIT-green)
 
+https://github.com/user-attachments/assets/875455ac-0c54-4a28-b0ae-28af9adc0143
+
+<sub>61-second walkthrough with voiceover. Can't play it? [Download the MP4](docs/demo.mp4).</sub>
+
 ![The playground: a sales user asks for ACME's old tickets to be noted on the deal; the agent calls seven tools through the gateway, ticket bodies come back marked as untrusted, the note waits for a confirmation, then the answer](docs/screenshots/hero.png)
 
 <sub>A real run with the free `nvidia/nemotron-3-super-120b-a12b:free` in the admin console's playground, as Alice (sales). The model sees the 17 tools her role allows (not all 23), searches tickets and deals, reads three tickets whose bodies the gateway wrapped as untrusted, and proposes a note on deal D-3001. The write stops at a confirmation (MCP elicitation, "Approved by you") before the CRM server applies it with an idempotency key. The first four model calls were replayed from the disk cache of an identical earlier run; the rest were live.</sub>
