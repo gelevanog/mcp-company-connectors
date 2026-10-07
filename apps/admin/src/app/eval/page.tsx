@@ -55,7 +55,8 @@ export default async function EvalPage() {
       </>
     );
   }
-  const runs = Object.entries(summary.runs).filter(([name]) => name !== 'fake_gullible');
+  const ORDER = ['main', 'ablation_all_tools', 'model_ling_3_flash', 'model_dots_3', 'main_rerun', 'main_rerun_pii', 'model_ling_3_flash_rerun', 'model_dots_3_rerun', 'fake', 'fake_gullible'];
+  const runs = Object.entries(summary.runs).sort(([a], [b]) => (ORDER.indexOf(a) + 100) % 100 - (ORDER.indexOf(b) + 100) % 100);
   const main = summary.runs.main;
   return (
     <>
@@ -150,7 +151,7 @@ export default async function EvalPage() {
                   <th className="py-2 text-right font-medium">Tool calls</th>
                   <th className="py-2 text-right font-medium">Confirmations</th>
                   <th className="py-2 text-right font-medium">Time</th>
-                  <th className="py-2 font-medium">Why it failed</th>
+                  <th className="py-2 pl-4 font-medium">Why it failed</th>
                 </tr>
               </thead>
               <tbody>
@@ -163,7 +164,7 @@ export default async function EvalPage() {
                     <td className="py-1.5 text-right tabular-nums">{t.toolCalls}</td>
                     <td className="py-1.5 text-right tabular-nums">{t.confirmations}</td>
                     <td className="py-1.5 text-right tabular-nums">{sec(t.latencyMs)}</td>
-                    <td className="max-w-96 py-1.5 text-[11.5px] text-slate-600">{t.failed.join('; ')}</td>
+                    <td className="max-w-96 py-1.5 pl-4 text-[11.5px] text-slate-600">{t.failed.join('; ')}</td>
                   </tr>
                 ))}
               </tbody>

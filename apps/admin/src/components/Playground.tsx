@@ -241,7 +241,7 @@ export function Playground({ presets, models, users }: { presets: Preset[]; mode
                         {!outcome && <span className="text-[11px] text-slate-400">{progress.get(event.id) ?? 'running…'}</span>}
                       </div>
                     </div>
-                    <pre className="mt-1.5 font-mono text-[11.5px] break-all whitespace-pre-wrap text-slate-500">{JSON.stringify(event.args)}</pre>
+                    <pre className="mt-1.5 line-clamp-3 font-mono text-[11.5px] break-all whitespace-pre-wrap text-slate-500">{JSON.stringify(event.args)}</pre>
                     {confirmationsFor(index).map((c) => renderConfirmation(c, c.key))}
                     {outcome && (
                       <details className="mt-1.5" open={outcome.isError || outcome.flags.includes('injection_suspected')}>
