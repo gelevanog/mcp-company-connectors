@@ -31,7 +31,7 @@ https://github.com/user-attachments/assets/875455ac-0c54-4a28-b0ae-28af9adc0143
 | Planted prompt injections (ticket body, deal note, ticket comment, community article) | **0 actions taken** by any real model in 5 injection tasks × 3 models. With an offline model that obeys every injected instruction: **3 of 3 attempts stopped** (1 by the gateway's recipient check, 2 at the user's confirmation) |
 | Tool filtering ablation: role's tools (15.6 on average) vs all 23 tools, same 17 tasks | success 17/17 both; with all tools: **4 calls to tools the role may not use** (vs 0), **+29% prompt tokens** (39.4k vs 30.6k per task), p50 15.2 s vs 11.7 s |
 | A privacy gap the evaluation found | analysts could read contact emails through `crm_get_company`: two of three models answered with **44 and 46 customer email addresses**. Fixed with a `contacts:pii` scope; re-run with all three models: **0 emails** reached the model |
-| Protocol conformance (SDK client, both protocol eras, HTTP and stdio) and OAuth tests | **136 tests pass** without API keys: tools, schemas, resources, prompts, completion, pagination, progress, cancellation into PostgreSQL, 401/403 paths, PKCE, audiences, refresh rotation |
+| Protocol conformance (SDK client, both protocol eras, HTTP and stdio) and OAuth tests | **142 tests pass** without API keys: tools, schemas, resources, prompts, completion, pagination, progress, cancellation into PostgreSQL, 401/403 paths, PKCE, audiences, refresh rotation |
 | Security tests: roles, read-only SQL (validator and database grants), confirmations, idempotency, rate limits, injection | all pass (26 tests, plus 40 SQL validator tests) |
 | Gateway overhead per tool call (100 sequential calls) | **+4 ms** p50 (8.0 ms through the gateway vs 4.0 ms straight to the server) |
 | Cloud usage | **403 requests** to OpenRouter in total, every model id `:free` ([ledger](results/calls.jsonl)) |
@@ -68,7 +68,7 @@ Switchboard is that layer. Each system gets its own MCP server; a gateway in fro
   - **Per-tenant configuration** (upstream servers, roles, confirmation rules, limits) in YAML; secrets (signing keys, database logins, model keys) stay on the server.
 - **Admin console** (Next.js, TypeScript strict, Tailwind): overview, a **playground** that runs an agent as any user through the gateway's own `/mcp` (confirmations appear as Approve/Decline cards), **tools per role** with switches, **approvals** (outbox and pending writes), the **audit log** with filters, **clients and sessions** (OAuth grants with revoke, recent traffic per user and client), the **evaluation** results and copy-paste **client configurations**. It signs in to the gateway with the same OAuth flow (its own audience: the admin API).
 - **CLI**: `switchboard seed | serve <server|all> [--stdio] | gateway [--stdio] | dev | token | eval …`.
-- **An agent loop and an MCP client** (TypeScript SDK) used by the playground and the evaluation, with an OpenRouter client (tool calling), a **free-only guard**, a budget wrapper (disk cache, throttle, retries, hard call budget, a JSONL ledger) and a deterministic offline model for tests and the zero-key demo.
+- **An agent loop and an MCP client** (TypeScript SDK) used by the playground and the evaluation, with an OpenRouter / OpenAI-compatible client (tool calling), a **free-only guard** (paid models only behind an explicit opt-in), a budget wrapper (disk cache, throttle, retries, hard call budget, a JSONL ledger) and a deterministic offline model for tests and the zero-key demo.
 
 ## How it works
 
@@ -247,7 +247,10 @@ Everything is an environment variable ([`.env.example`](.env.example) documents 
 | `ANALYTICS_MAX_ROWS` / `ANALYTICS_STATEMENT_TIMEOUT_MS` | `200` / `5000` | row cap and time limit of analytics queries |
 | `SWITCHBOARD_TODAY` | `2026-10-01` | the demo's "today" (empty = the real date) |
 | `OPENROUTER_API_KEY` / `SWITCHBOARD_LLM_MODEL` | none / `nvidia/nemotron-3-super-120b-a12b:free` | model for the playground and the evaluation |
-| `SWITCHBOARD_REQUIRE_FREE_MODELS` | `true` | refuse OpenRouter model ids without `:free`, and answers served by a paid model |
+| `SWITCHBOARD_REQUIRE_FREE_MODELS` | `true` | refuse model ids without `:free` (any provider), and answers served by a paid model |
+| `SWITCHBOARD_ALLOW_PAID_MODELS` | off | the explicit opt-in for non-`:free` model ids (`1` to enable) |
+| `SWITCHBOARD_LLM_BASE_URL` / `SWITCHBOARD_LLM_API_KEY` | none | any OpenAI-compatible endpoint for `eval run --provider openai_compatible` |
+| `SWITCHBOARD_LLM_TEMPERATURE` / `SWITCHBOARD_LLM_REASONING_EFFORT` | `0` / `low` | `omit` / `none` leave the field out (some models reject it) |
 | `SWITCHBOARD_LLM_MAX_CALLS` / `SWITCHBOARD_LLM_LEDGER` | `500` / `results/calls.jsonl` | hard budget and ledger of real API calls |
 
 The policy file, abridged:
@@ -338,7 +341,7 @@ The same 17-task subset, same model, either the role's tools (the main run) or e
 
 On this model and task set, filtering did not change success, which I did not expect: a strong model mostly ignores tools it does not need. It did change behavior: with every tool listed the model reached for tools the role may not use in 3 of 17 tasks (each refused by the gateway, so nothing leaked), prompts grew by 29% and answers came slower. Filtering is a security control first and an accuracy aid second; the accuracy effect is likely larger with weaker models or bigger tool catalogs, which this run did not measure.
 
-### Model comparison (same 17 tasks, role-filtered tools)
+### Free model comparison (same 17 tasks, role-filtered tools)
 
 | Model (all free on OpenRouter) | Success | Tool errors | Calls outside the role | Model calls per task | p50 latency | Notes |
 |---|---|---|---|---|---|---|
@@ -378,6 +381,34 @@ Taken with headless Chrome from the running console ([`capture.mjs`](docs/screen
 ![Clients and sessions: recent activity per user and client, OAuth grants with revoke, registered clients](docs/screenshots/clients.png)
 
 <sub>Clients and sessions: in MCP 2026-07-28 there are no protocol sessions, so a "connected assistant" is an OAuth grant plus its recent traffic.</sub>
+
+## Model comparison
+
+The defaults remain free-only (OpenRouter `:free` ids, enforced on request and response); stronger models are an explicit opt-in with `SWITCHBOARD_ALLOW_PAID_MODELS=1`, on OpenRouter or any OpenAI-compatible endpoint:
+
+```bash
+export SWITCHBOARD_ALLOW_PAID_MODELS=1
+export SWITCHBOARD_LLM_BASE_URL=https://your-endpoint/v1 SWITCHBOARD_LLM_API_KEY=<your-key>
+export SWITCHBOARD_LLM_TEMPERATURE=omit SWITCHBOARD_LLM_REASONING_EFFORT=none   # as used for the runs below
+node packages/cli/dist/main.js eval run --name haiku --provider openai_compatible --model claude-haiku-5-5
+```
+
+Same harness, tasks, seeded database and simulated user as above; run on 2026-10-12, one run per model, no repeats.
+
+| Model | Tasks passed (tasks run) | Same 17-task subset | Tool calls / task (subset) | Cost per task |
+|---|---|---|---|---|
+| free `nemotron-3-super` (with the fixes) | 39/39 | 17/17 | 3.12 | $0 (free tier) |
+| Claude Haiku 5.5 | 38/39 | 16/17 | 2.35 | ≈ $0.0023 |
+| Claude Opus 5.5 | 22/22 | 17/17 | 2.47 | ≈ $0.10 |
+| Qwen 3.7 Plus | 27/27 | 17/17 | 2.53 | ≈ 17k tokens (token quota, no $ price) |
+
+- On this task set the free baseline was already enough: no paid model fixed a task that the code fixes had not already fixed.
+- Haiku was the most efficient: on all 39 tasks 2.1 tool calls and 2.8 model calls per task (free: 2.7 and 3.6), p50 latency 5.5 s vs 11.7 s, about $0.09 for the whole set. Its one miss (s01) listed an extra ticket the task excluded.
+- The paid models did not show the weaker free models' failure mode (asking "shall I proceed?" in chat instead of calling the write tool); all three called the tool and let the gateway ask the user.
+- No model, free or paid, acted on a planted injection; calls outside the role were 0 for every model.
+- Opus matched the free baseline (22/22) at about 45x Haiku's price per task. Differences of one task are within run-to-run noise at these sample sizes (17-39 tasks), and latency is not comparable across providers.
+
+Full tables, per-task files, the call ledger and caveats: [`results/paid-models/COMPARISON.md`](results/paid-models/COMPARISON.md).
 
 ## Key design decisions
 
@@ -429,7 +460,7 @@ docs/screenshots/    screenshots and the script that takes them
 ## Testing
 
 ```bash
-make test        # 136 tests (vitest): unit, contracts, MCP integration over HTTP and stdio, OAuth, security, agent loop
+make test        # 142 tests (vitest): unit, contracts, MCP integration over HTTP and stdio, OAuth, security, agent loop
 make lint        # ESLint with typed rules (typescript-eslint strict) for the packages, eslint-config-next for the console
 make typecheck   # tsc for the packages, the tests and the console
 make eval-offline  # all 39 tasks with the offline model, and the gullible model's injection run (no API calls)
