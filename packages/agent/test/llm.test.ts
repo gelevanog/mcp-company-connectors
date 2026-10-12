@@ -98,7 +98,7 @@ describe('paid-model opt-in (OpenAI-compatible endpoint)', () => {
         return reply('claude-haiku-5-5');
       },
     });
-    const result = await model.complete({ messages: [{ role: 'user', content: 'x' }], tools: [] });
+    const result = await model.complete({ messages: [{ role: 'user', content: 'x' }], tools: [], temperature: 0 });
     expect(url).toBe('http://127.0.0.1:9/v1/chat/completions');
     expect(sent).toMatchObject({ model: 'claude-haiku-5-5', max_tokens: 2048 });
     expect(sent).not.toHaveProperty('temperature');

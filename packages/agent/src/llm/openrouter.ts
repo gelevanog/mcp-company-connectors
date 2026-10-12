@@ -9,7 +9,7 @@ export interface OpenAiCompatibleOptions {
   /** The free-only guard (default on unless SWITCHBOARD_ALLOW_PAID_MODELS=1), for every provider. */
   requireFree?: boolean;
   reasoningEffort?: 'low' | 'medium' | 'high' | undefined;
-  /** Default temperature (0); null omits the field (some endpoints reject it). A request's own value wins. */
+  /** Default temperature (0) when a request sets none; null never sends the field (some models reject it). */
   temperature?: number | null;
   timeoutMs?: number;
   provider?: 'openrouter' | 'openai_compatible';
@@ -48,7 +48,7 @@ export class OpenAiCompatibleModel implements ChatModel {
   }
 
   async complete(request: CompletionRequest): Promise<Completion> {
-    const temperature = request.temperature ?? (this.options.temperature === undefined ? 0 : this.options.temperature);
+    const temperature = this.options.temperature === null ? null : request.temperature ?? this.options.temperature ?? 0;
     const body: Record<string, unknown> = {
       model: this.options.model,
       messages: request.messages,
