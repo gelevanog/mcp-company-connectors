@@ -1,7 +1,7 @@
 import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 
-import { BudgetedModel, type ChatModel, OpenAiCompatibleModel, createModel, ensureFreeModels } from '@switchboard/agent';
+import { BudgetedModel, type ChatModel, OpenAiCompatibleModel, createModel, ensureFreeModels, requireFreeModels } from '@switchboard/agent';
 import { databaseUrl } from '@switchboard/core';
 import { fakeScripts, repoRoot } from '@switchboard/gateway';
 import type { Command } from 'commander';
@@ -27,9 +27,10 @@ function list(value: string | undefined): string[] {
 
 interface RunOptions {
   name: string;
-  provider: 'fake' | 'openrouter';
+  provider: 'fake' | 'openrouter' | 'openai_compatible';
   model?: string;
   fallbacks?: string;
+  baseUrl?: string;
   tasks?: string;
   subset?: boolean;
   exposeAll?: boolean;
@@ -100,9 +101,10 @@ export function registerEvalCommands(program: Command): void {
     .command('run')
     .description('Run the tasks through the gateway with an agent loop and score them')
     .requiredOption('--name <name>', 'result file name (results/<name>.json)')
-    .option('--provider <provider>', 'fake | openrouter', 'fake')
-    .option('--model <id>', 'OpenRouter model id (must end in :free)')
+    .option('--provider <provider>', 'fake | openrouter | openai_compatible', 'fake')
+    .option('--model <id>', 'model id (must end in :free unless SWITCHBOARD_ALLOW_PAID_MODELS=1)')
     .option('--fallbacks <ids>', 'comma-separated free fallback models', '')
+    .option('--base-url <url>', 'openai_compatible: the endpoint (default SWITCHBOARD_LLM_BASE_URL)')
     .option('--tasks <ids>', 'comma-separated task ids')
     .option('--subset', 'only the tasks marked subset (ablation and model comparison)')
     .option('--expose-all', 'list every tool to every user (calls are still authorized): the ablation')
@@ -110,13 +112,18 @@ export function registerEvalCommands(program: Command): void {
     .action(async (opts: RunOptions) => {
       const tasks = loadTasks().filter((task) => (opts.tasks ? list(opts.tasks).includes(task.id) : opts.subset ? task.subset : true));
       let model: ChatModel;
-      if (opts.provider === 'openrouter') {
+      if (opts.provider === 'openrouter' || opts.provider === 'openai_compatible') {
         const fallbacks = list(opts.fallbacks);
-        if (!opts.model) throw new Error('--model is required with --provider openrouter');
-        ensureFreeModels([opts.model, ...fallbacks]);
-        model = createModel({ provider: 'openrouter', model: opts.model, fallbacks, tag: `eval:${opts.name}` }, { ledgerPath: ledgerPath(), cacheDir: cacheDir() });
-      } else {
+        if (!opts.model) throw new Error(`--model is required with --provider ${opts.provider}`);
+        if (requireFreeModels()) ensureFreeModels([opts.model, ...fallbacks]);
+        model = createModel(
+          { provider: opts.provider, model: opts.model, fallbacks, tag: `eval:${opts.name}`, ...(opts.baseUrl && { baseUrl: opts.baseUrl }) },
+          { ledgerPath: ledgerPath(), cacheDir: cacheDir() },
+        );
+      } else if (opts.provider === 'fake') {
         model = createModel({ provider: 'fake', gullible: opts.gullible ?? false }, { scripts: fakeScripts() });
+      } else {
+        throw new Error(`unknown provider ${JSON.stringify(opts.provider)} (fake | openrouter | openai_compatible)`);
       }
       const stack = await startStack({ databaseUrl: process.env.EVAL_DATABASE_URL ?? databaseUrl(), evalMode: true, callsPerMinute: 1000, writesPerMinute: 1000 });
       const results: TaskResult[] = [];

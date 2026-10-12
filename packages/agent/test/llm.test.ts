@@ -2,11 +2,12 @@ import { mkdtempSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { BudgetedModel } from '../src/llm/budget.js';
+import { createModel, envReasoningEffort, envTemperature } from '../src/llm/factory.js';
 import { FakeModel } from '../src/llm/fake.js';
-import { ensureFreeModels } from '../src/llm/guards.js';
+import { allowPaidModels, ensureFreeModels, requireFreeModels } from '../src/llm/guards.js';
 import { OpenAiCompatibleModel } from '../src/llm/openrouter.js';
 import { BudgetExceededError, type ChatModel, type Completion, PolicyViolationError, RetryableLlmError } from '../src/llm/types.js';
 
@@ -47,6 +48,91 @@ describe('free-only guard', () => {
     const error = await model.complete({ messages: [], tools: [] }).catch((e: unknown) => e);
     expect(error).toBeInstanceOf(RetryableLlmError);
     expect((error as RetryableLlmError).retryAfterSeconds).toBe(2);
+  });
+});
+
+describe('paid-model opt-in (OpenAI-compatible endpoint)', () => {
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+  const compatible = { provider: 'openai_compatible' as const, baseUrl: 'http://127.0.0.1:9/v1', apiKey: 'test' };
+
+  it('is off by default: paid ids are refused for every provider, including OpenAI-compatible endpoints', () => {
+    vi.stubEnv('SWITCHBOARD_ALLOW_PAID_MODELS', '');
+    vi.stubEnv('SWITCHBOARD_REQUIRE_FREE_MODELS', '');
+    expect(allowPaidModels()).toBe(false);
+    expect(requireFreeModels()).toBe(true);
+    expect(() => new OpenAiCompatibleModel({ ...compatible, model: 'claude-haiku-5-5', fetch })).toThrow(/free-only guard/);
+    vi.stubEnv('SWITCHBOARD_LLM_BASE_URL', 'http://127.0.0.1:9/v1');
+    vi.stubEnv('SWITCHBOARD_LLM_API_KEY', 'test');
+    expect(() => createModel({ provider: 'openai_compatible', model: 'claude-haiku-5-5' }, { ledgerPath: undefined, cacheDir: undefined })).toThrow(/free-only guard/);
+    expect(() => createModel({ provider: 'openrouter', model: 'openai/gpt-x' }, { ledgerPath: undefined, cacheDir: undefined })).toThrow(/free-only guard/);
+  });
+
+  it('only an explicit truthy SWITCHBOARD_ALLOW_PAID_MODELS opts in', () => {
+    for (const value of ['0', 'false', 'no', 'maybe', '']) {
+      expect(allowPaidModels({ SWITCHBOARD_ALLOW_PAID_MODELS: value })).toBe(false);
+      expect(requireFreeModels({ SWITCHBOARD_ALLOW_PAID_MODELS: value })).toBe(true);
+    }
+    for (const value of ['1', 'true', 'YES', 'on']) {
+      expect(allowPaidModels({ SWITCHBOARD_ALLOW_PAID_MODELS: value })).toBe(true);
+      expect(requireFreeModels({ SWITCHBOARD_ALLOW_PAID_MODELS: value })).toBe(false);
+    }
+    expect(requireFreeModels({ SWITCHBOARD_REQUIRE_FREE_MODELS: 'false' })).toBe(false);
+  });
+
+  it('with the opt-in, talks to the base URL without OpenRouter-only fields and accepts a paid served model', async () => {
+    vi.stubEnv('SWITCHBOARD_ALLOW_PAID_MODELS', '1');
+    let url = '';
+    let sent: Record<string, unknown> = {};
+    let headers: Record<string, string> = {};
+    const model = new OpenAiCompatibleModel({
+      ...compatible,
+      model: 'claude-haiku-5-5',
+      fallbackModels: ['claude-opus-5-5'],
+      temperature: null,
+      fetch: async (input, init) => {
+        url = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url;
+        sent = JSON.parse(typeof init?.body === 'string' ? init.body : '{}') as Record<string, unknown>;
+        headers = init?.headers as Record<string, string>;
+        return reply('claude-haiku-5-5');
+      },
+    });
+    const result = await model.complete({ messages: [{ role: 'user', content: 'x' }], tools: [] });
+    expect(url).toBe('http://127.0.0.1:9/v1/chat/completions');
+    expect(sent).toMatchObject({ model: 'claude-haiku-5-5', max_tokens: 2048 });
+    expect(sent).not.toHaveProperty('temperature');
+    expect(sent).not.toHaveProperty('models');
+    expect(sent).not.toHaveProperty('reasoning');
+    expect(headers).not.toHaveProperty('x-title');
+    expect(result.model).toBe('claude-haiku-5-5');
+    expect(model.label).toBe('openai_compatible/claude-haiku-5-5');
+  });
+
+  it('needs a base URL for openai_compatible', () => {
+    vi.stubEnv('SWITCHBOARD_ALLOW_PAID_MODELS', '1');
+    expect(() => new OpenAiCompatibleModel({ provider: 'openai_compatible', apiKey: 'test', model: 'm' })).toThrow(/base URL/);
+  });
+
+  it('stops on an exhausted spending cap and retries a transient 403 from a gateway', async () => {
+    vi.stubEnv('SWITCHBOARD_ALLOW_PAID_MODELS', '1');
+    const capped = new OpenAiCompatibleModel({ ...compatible, model: 'm', fetch: async () => new Response('{"error":{"type":"budget_exhausted"}}', { status: 429 }) });
+    await expect(capped.complete({ messages: [], tools: [] })).rejects.toBeInstanceOf(BudgetExceededError);
+    const flaky = new OpenAiCompatibleModel({ ...compatible, model: 'm', fetch: async () => new Response('Request not allowed', { status: 403 }) });
+    await expect(flaky.complete({ messages: [], tools: [] })).rejects.toBeInstanceOf(RetryableLlmError);
+    const openRouter = new OpenAiCompatibleModel({ model: 'a/b:free', apiKey: 'test', fetch: async () => new Response('Request not allowed', { status: 403 }) });
+    const refused = await openRouter.complete({ messages: [], tools: [] }).catch((e: unknown) => e);
+    expect(refused).not.toBeInstanceOf(RetryableLlmError);
+  });
+
+  it('reads temperature and reasoning settings from the environment', () => {
+    expect(envTemperature({})).toBe(0);
+    expect(envTemperature({ SWITCHBOARD_LLM_TEMPERATURE: 'omit' })).toBeNull();
+    expect(envTemperature({ SWITCHBOARD_LLM_TEMPERATURE: '0.3' })).toBe(0.3);
+    expect(() => envTemperature({ SWITCHBOARD_LLM_TEMPERATURE: 'hot' })).toThrow();
+    expect(envReasoningEffort({})).toBe('low');
+    expect(envReasoningEffort({ SWITCHBOARD_LLM_REASONING_EFFORT: 'none' })).toBeUndefined();
+    expect(envReasoningEffort({ SWITCHBOARD_LLM_REASONING_EFFORT: 'high' })).toBe('high');
   });
 });
 
