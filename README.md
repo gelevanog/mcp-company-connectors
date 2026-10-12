@@ -12,6 +12,7 @@
 ![Next.js](https://img.shields.io/badge/Next.js-16-000000?logo=nextdotjs&logoColor=white)
 ![Models](https://img.shields.io/badge/models-free%20via%20OpenRouter-2b8a3e)
 ![License: MIT](https://img.shields.io/badge/License-MIT-green)
+[![M8ven Score](https://m8ven.ai/badge/mcp/gelevanog-mcp-company-connectors-whm8ki?v=73d69cc9896b9fa00ad7905ce9bf2bb8)](https://m8ven.ai/mcp/gelevanog-mcp-company-connectors-whm8ki?s=readme)
 
 https://github.com/user-attachments/assets/875455ac-0c54-4a28-b0ae-28af9adc0143
 
