@@ -1,20 +1,26 @@
 import { ensureFreeModels, ensureServedFree, requireFreeModels } from './guards.js';
-import { type ChatModel, type Completion, type CompletionRequest, LlmError, RetryableLlmError } from './types.js';
+import { BudgetExceededError, type ChatModel, type Completion, type CompletionRequest, LlmError, RetryableLlmError } from './types.js';
 
 export interface OpenAiCompatibleOptions {
   model: string;
   fallbackModels?: string[];
   apiKey: string;
-  baseUrl?: string;
-  /** OpenRouter only: the free-only guard (default on). */
+  baseUrl?: string | undefined;
+  /** The free-only guard (default on unless SWITCHBOARD_ALLOW_PAID_MODELS=1), for every provider. */
   requireFree?: boolean;
   reasoningEffort?: 'low' | 'medium' | 'high' | undefined;
+  /** Default temperature (0) when a request sets none; null never sends the field (some models reject it). */
+  temperature?: number | null;
   timeoutMs?: number;
   provider?: 'openrouter' | 'openai_compatible';
   fetch?: typeof fetch;
 }
 
-/** Chat completions with tool calling over OpenRouter (or any OpenAI-compatible endpoint). */
+/**
+ * Chat completions with tool calling over OpenRouter (default) or any OpenAI-compatible endpoint
+ * (`provider: 'openai_compatible'` with a `baseUrl`). OpenRouter-only fields (fallback `models`, attribution
+ * headers) are sent to OpenRouter only.
+ */
 export class OpenAiCompatibleModel implements ChatModel {
   readonly isLocal = false;
   readonly label: string;
@@ -22,9 +28,10 @@ export class OpenAiCompatibleModel implements ChatModel {
 
   constructor(private readonly options: OpenAiCompatibleOptions) {
     const provider = options.provider ?? 'openrouter';
-    this.requireFree = provider === 'openrouter' && (options.requireFree ?? requireFreeModels());
+    this.requireFree = options.requireFree ?? requireFreeModels();
     if (this.requireFree) ensureFreeModels([options.model, ...(options.fallbackModels ?? [])]);
-    if (!options.apiKey) throw new LlmError(`${provider}: no API key (set OPENROUTER_API_KEY)`);
+    if (provider === 'openai_compatible' && !options.baseUrl) throw new LlmError('openai_compatible: no base URL (set SWITCHBOARD_LLM_BASE_URL)');
+    if (!options.apiKey) throw new LlmError(`${provider}: no API key (set ${provider === 'openrouter' ? 'OPENROUTER_API_KEY' : 'SWITCHBOARD_LLM_API_KEY'})`);
     this.label = `${provider}/${options.model}`;
   }
 
@@ -36,14 +43,19 @@ export class OpenAiCompatibleModel implements ChatModel {
     return new OpenAiCompatibleModel({ ...this.options, model, fallbackModels });
   }
 
+  private get isOpenRouter(): boolean {
+    return (this.options.provider ?? 'openrouter') === 'openrouter';
+  }
+
   async complete(request: CompletionRequest): Promise<Completion> {
+    const temperature = this.options.temperature === null ? null : request.temperature ?? this.options.temperature ?? 0;
     const body: Record<string, unknown> = {
       model: this.options.model,
       messages: request.messages,
-      temperature: request.temperature ?? 0,
+      ...(temperature !== null && { temperature }),
       max_tokens: request.maxTokens ?? 2048,
       ...(request.tools.length > 0 && { tools: request.tools, tool_choice: 'auto' }),
-      ...(this.options.fallbackModels && this.options.fallbackModels.length > 0 && { models: [this.options.model, ...this.options.fallbackModels] }),
+      ...(this.isOpenRouter && this.options.fallbackModels && this.options.fallbackModels.length > 0 && { models: [this.options.model, ...this.options.fallbackModels] }),
       ...(this.options.reasoningEffort && { reasoning: { effort: this.options.reasoningEffort } }),
     };
     if (this.requireFree) ensureFreeModels([String(body.model), ...((body.models as string[] | undefined) ?? [])]);
@@ -55,8 +67,7 @@ export class OpenAiCompatibleModel implements ChatModel {
         headers: {
           authorization: `Bearer ${this.options.apiKey}`,
           'content-type': 'application/json',
-          'http-referer': 'https://github.com/gelevanog/mcp-company-connectors',
-          'x-title': 'Switchboard evaluation',
+          ...(this.isOpenRouter && { 'http-referer': 'https://github.com/gelevanog/mcp-company-connectors', 'x-title': 'Switchboard evaluation' }),
         },
         body: JSON.stringify(body),
         signal: AbortSignal.timeout(this.options.timeoutMs ?? 180_000),
@@ -65,6 +76,10 @@ export class OpenAiCompatibleModel implements ChatModel {
       throw new RetryableLlmError(`network error: ${error instanceof Error ? error.message : String(error)}`);
     }
     const text = await response.text();
+    // A spending cap on the endpoint (e.g. a budget proxy): retrying cannot help, so stop like the call budget does.
+    if (response.status === 429 && /budget_exhausted/.test(text)) throw new BudgetExceededError(`upstream budget exhausted: ${text.slice(0, 200)}`);
+    // Some OpenAI-compatible gateways return a transient 403 "Request not allowed"; OpenRouter's 403 is a refusal.
+    if (response.status === 403 && !this.isOpenRouter && /request not allowed/i.test(text)) throw new RetryableLlmError(`upstream 403 (transient): ${text.slice(0, 200)}`);
     if (response.status === 429 || response.status >= 500 || response.status === 408) {
       const retryAfter = Number(response.headers.get('retry-after') ?? '');
       throw new RetryableLlmError(`upstream ${response.status}: ${text.slice(0, 200)}`, Number.isFinite(retryAfter) && retryAfter > 0 ? retryAfter : undefined);
