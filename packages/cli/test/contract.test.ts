@@ -104,6 +104,20 @@ describe.skipIf(!available)('tool contracts (every server, every tool)', () => {
     expect(unknown?.isError).toBe(true);
   });
 
+  // https://github.com/gelevanog/mcp-company-connectors/issues/1
+  it('offers only slots that fit inside 09:00-17:00 of one local day', async () => {
+    const workspace = clients.get('workspace');
+    const result = await workspace?.callTool({ name: 'calendar_find_availability', arguments: { duration_minutes: 180, from: '2026-10-05', to: '2026-10-09', max_slots: 20 } });
+    const { slots } = result?.structuredContent as { slots: { local_times: Record<string, string> }[] };
+    expect(slots.length).toBeGreaterThan(0);
+    for (const slot of slots) {
+      const [hh, mm] = (slot.local_times.adam?.split(', ').pop() ?? '').split(':').map(Number);
+      const startMinutes = (hh ?? 0) * 60 + (mm ?? 0);
+      expect(startMinutes, slot.local_times.adam).toBeGreaterThanOrEqual(9 * 60);
+      expect(startMinutes + 180, slot.local_times.adam).toBeLessThanOrEqual(17 * 60);
+    }
+  });
+
   it('rejects arguments that break the input schema before the handler runs', async () => {
     const crm = clients.get('crm');
     const result = await crm?.callTool({ name: 'crm_update_deal_stage', arguments: { deal_id: 'D-3001', stage: 'closed-ish' } });

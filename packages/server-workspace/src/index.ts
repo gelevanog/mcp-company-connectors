@@ -111,10 +111,21 @@ async function employee(db: Queryable, idOrEmail: string): Promise<{ id: string;
   return row;
 }
 
-function localHour(date: Date, timezone: string): { hour: number; minute: number; weekday: string } {
-  const parts = new Intl.DateTimeFormat('en-US', { timeZone: timezone, hour: 'numeric', minute: 'numeric', weekday: 'short', hourCycle: 'h23' }).formatToParts(date);
+function localTime(date: Date, timezone: string): { day: string; minutes: number; weekday: string } {
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: timezone, year: 'numeric', month: '2-digit', day: '2-digit', hour: 'numeric', minute: 'numeric', weekday: 'short', hourCycle: 'h23',
+  }).formatToParts(date);
   const get = (type: string) => parts.find((part) => part.type === type)?.value ?? '0';
-  return { hour: Number(get('hour')), minute: Number(get('minute')), weekday: get('weekday') };
+  return { day: `${get('year')}-${get('month')}-${get('day')}`, minutes: Number(get('hour')) * 60 + Number(get('minute')), weekday: get('weekday') };
+}
+
+/** True when [start, end) lies within 09:00-17:00 of a single local working day (Mon-Fri) in `timezone`. */
+export function withinWorkingHours(start: Date, end: Date, timezone: string): boolean {
+  const s = localTime(start, timezone);
+  const last = localTime(new Date(end.getTime() - 60_000), timezone); // the slot's last minute
+  if (s.weekday === 'Sat' || s.weekday === 'Sun') return false;
+  if (last.day !== s.day) return false; // crosses local midnight
+  return s.minutes >= 9 * 60 && last.minutes + 1 <= 17 * 60;
 }
 
 export function workspaceTools(): AnyToolSpec[] {
@@ -180,10 +191,7 @@ export function workspaceTools(): AnyToolSpec[] {
         const start = new Date(t);
         const end = new Date(t + durationMs);
         const ok = people.every((person) => {
-          const s = localHour(start, person.timezone);
-          const e = localHour(new Date(t + durationMs - 60_000), person.timezone);
-          if (s.weekday === 'Sat' || s.weekday === 'Sun') return false;
-          if (s.hour < 9 || e.hour >= 17) return false;
+          if (!withinWorkingHours(start, end, person.timezone)) return false;
           return !busy.some((b) => b.owner_id === person.id && Date.parse(b.starts_at) < end.getTime() && Date.parse(b.ends_at) > t);
         });
         if (ok) {

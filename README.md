@@ -31,7 +31,7 @@ https://github.com/user-attachments/assets/875455ac-0c54-4a28-b0ae-28af9adc0143
 | Planted prompt injections (ticket body, deal note, ticket comment, community article) | **0 actions taken** by any real model in 5 injection tasks × 3 models. With an offline model that obeys every injected instruction: **3 of 3 attempts stopped** (1 by the gateway's recipient check, 2 at the user's confirmation) |
 | Tool filtering ablation: role's tools (15.6 on average) vs all 23 tools, same 17 tasks | success 17/17 both; with all tools: **4 calls to tools the role may not use** (vs 0), **+29% prompt tokens** (39.4k vs 30.6k per task), p50 15.2 s vs 11.7 s |
 | A privacy gap the evaluation found | analysts could read contact emails through `crm_get_company`: two of three models answered with **44 and 46 customer email addresses**. Fixed with a `contacts:pii` scope; re-run with all three models: **0 emails** reached the model |
-| Protocol conformance (SDK client, both protocol eras, HTTP and stdio) and OAuth tests | **142 tests pass** without API keys: tools, schemas, resources, prompts, completion, pagination, progress, cancellation into PostgreSQL, 401/403 paths, PKCE, audiences, refresh rotation |
+| Protocol conformance (SDK client, both protocol eras, HTTP and stdio) and OAuth tests | **147 tests pass** without API keys: tools, schemas, resources, prompts, completion, pagination, progress, cancellation into PostgreSQL, 401/403 paths, PKCE, audiences, refresh rotation |
 | Security tests: roles, read-only SQL (validator and database grants), confirmations, idempotency, rate limits, injection | all pass (26 tests, plus 40 SQL validator tests) |
 | Gateway overhead per tool call (100 sequential calls) | **+4 ms** p50 (8.0 ms through the gateway vs 4.0 ms straight to the server) |
 | Cloud usage | **403 requests** to OpenRouter in total, every model id `:free` ([ledger](results/calls.jsonl)) |
@@ -460,7 +460,7 @@ docs/screenshots/    screenshots and the script that takes them
 ## Testing
 
 ```bash
-make test        # 142 tests (vitest): unit, contracts, MCP integration over HTTP and stdio, OAuth, security, agent loop
+make test        # 147 tests (vitest): unit, contracts, MCP integration over HTTP and stdio, OAuth, security, agent loop
 make lint        # ESLint with typed rules (typescript-eslint strict) for the packages, eslint-config-next for the console
 make typecheck   # tsc for the packages, the tests and the console
 make eval-offline  # all 39 tasks with the offline model, and the gullible model's injection run (no API calls)
